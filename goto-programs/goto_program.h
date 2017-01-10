@@ -119,8 +119,6 @@ public:
     labelst labels;
 
     // for k-induction
-    bool converted_loop;
-
     bool inductive_step_instruction;
 
     //! is this node a branch target?
@@ -134,6 +132,7 @@ public:
       targets.clear();
       guard = true_expr;
       code = expr2tc();
+      inductive_step_instruction = false;
     }
 
     inline void make_goto() { clear(GOTO); }
@@ -209,7 +208,6 @@ public:
     inline instructiont():
       location(static_cast<const locationt &>(get_nil_irep())),
       type(NO_INSTRUCTION_TYPE),
-      converted_loop(false),
       inductive_step_instruction(false),
       location_number(0),
       loop_number(unsigned(0)),
@@ -221,7 +219,6 @@ public:
     inline instructiont(goto_program_instruction_typet _type):
       location(static_cast<const locationt &>(get_nil_irep())),
       type(_type),
-      converted_loop(false),
       inductive_step_instruction(false),
       location_number(0),
       loop_number(unsigned(0)),
@@ -240,6 +237,7 @@ public:
       instruction.targets.swap(targets);
       instruction.local_variables.swap(local_variables);
       instruction.function.swap(function);
+      std::swap(inductive_step_instruction, instruction.inductive_step_instruction);
     }
 
     //! A globally unique number to identify a program location.
@@ -279,6 +277,15 @@ public:
 
       return false;
     }
+
+    void dump() const;
+
+    void output_instruction(
+      const class namespacet &ns,
+      const irep_idt &identifier,
+      std::ostream &out,
+      bool show_location=true,
+      bool show_variables=false) const;
   };
 
   typedef std::list<class instructiont> instructionst;
@@ -382,16 +389,13 @@ public:
   }
 
   //! Output goto program to given stream
+  void dump() const;
+
+  //! Output goto-program to given stream
   std::ostream &output(
     const namespacet &ns,
     const irep_idt &identifier,
     std::ostream &out) const;
-
-  //! Output goto-program to given stream
-  inline std::ostream &output(std::ostream &out = std::cout) const
-  {
-    return output(namespacet(contextt()), "", out);
-  }
 
   //! Compute the target numbers
   void compute_target_numbers();
@@ -451,15 +455,6 @@ public:
 
   //! Does the goto program have an assertion?
   bool has_assertion() const;
-
-  std::ostream &output_instruction(
-    const class namespacet &ns,
-    const irep_idt &identifier,
-    std::ostream &out,
-    instructionst::const_iterator it,
-    bool show_location=true,
-    bool show_variables=false) const;
-
 };
 
 bool operator<(const goto_programt::const_targett i1,

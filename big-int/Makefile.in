@@ -118,7 +118,7 @@ am__v_AR_0 = @echo "  AR      " $@;
 am__v_AR_1 = 
 libbigint_a_AR = $(AR) $(ARFLAGS)
 libbigint_a_LIBADD =
-am_libbigint_a_OBJECTS = bigint-func.$(OBJEXT) bigint.$(OBJEXT)
+am_libbigint_a_OBJECTS = bigint.$(OBJEXT)
 libbigint_a_OBJECTS = $(am_libbigint_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -358,7 +358,7 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 noinst_LIBRARIES = libbigint.a
-libbigint_a_SOURCES = bigint-func.cpp bigint.cpp
+libbigint_a_SOURCES = bigint.cpp
 AM_CXXFLAGS = $(ESBMC_CXXFLAGS) -I$(top_srcdir) -I$(top_srcdir)/utils
 all: all-am
 
@@ -408,7 +408,6 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bigint-func.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bigint.Po@am__quote@
 
 .cpp.o:

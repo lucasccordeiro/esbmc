@@ -22,13 +22,14 @@ typet build_float_type(unsigned width)
   }
   else
   {
-    floatbv_typet result=floatbv_typet();
+    floatbv_typet result;
     result.set_width(width);
 
     switch(width)
     {
     case 32: result.set_f(23); break;
     case 64: result.set_f(52); break;
+    case 128: result.set_f(112); break;
     default: assert(false);
     }
 
@@ -138,6 +139,11 @@ typet char32_type()
 typet wchar_type()
 {
   return signedbv_typet(config.ansi_c.int_width);
+}
+
+typet unsigned_wchar_type()
+{
+  return unsignedbv_typet(config.ansi_c.int_width);
 }
 
 type2tc char_type2()

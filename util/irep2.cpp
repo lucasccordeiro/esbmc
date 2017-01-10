@@ -48,6 +48,7 @@ static const char *type_names[] = {
   "unsignedbv",
   "signedbv",
   "fixedbv",
+  "floatbv",
   "string",
   "cpp_name"
 };
@@ -256,6 +257,12 @@ fixedbv_type2t::get_width(void) const
 }
 
 unsigned int
+floatbv_type2t::get_width(void) const
+{
+  return fraction + exponent + 1;
+}
+
+unsigned int
 code_data::get_width(void) const
 {
   throw new symbolic_type_excp();
@@ -435,6 +442,18 @@ expr2t::hash(crypto_hash &hash) const
 expr2tc
 expr2t::simplify(void) const
 {
+  try {
+
+  // Corner case! Don't even try to simplify address of's operands, might end up
+  // taking the address of some /completely/ arbitary pice of data, by
+  // simplifiying an index to its data, discarding the symbol.
+  if (__builtin_expect((expr_id == address_of_id), 0)) // unlikely
+    return expr2tc();
+
+  // And overflows too. We don't wish an add to distribute itself, for example,
+  // when we're trying to work out whether or not it's going to overflow.
+  if (__builtin_expect((expr_id == overflow_id), 0))
+    return expr2tc();
 
   // Try initial simplification
   expr2tc res = do_simplify();
@@ -450,17 +469,6 @@ expr2t::simplify(void) const
     else
       return res2;
   }
-
-  // Corner case! Don't even try to simplify address of's operands, might end up
-  // taking the address of some /completely/ arbitary pice of data, by
-  // simplifiying an index to its data, discarding the symbol.
-  if (__builtin_expect((expr_id == address_of_id), 0)) // unlikely
-    return expr2tc();
-
-  // And overflows too. We don't wish an add to distribute itself, for example,
-  // when we're trying to work out whether or not it's going to overflow.
-  if (__builtin_expect((expr_id == overflow_id), 0))
-    return expr2tc();
 
   // Try simplifying all the sub-operands.
   bool changed = false;
@@ -504,11 +512,20 @@ expr2t::simplify(void) const
     return new_us;
   else
     return tmp;
+
+  } catch (array_type2t::dyn_sized_array_excp *e) {
+    // Pretty much anything in any expression could be fouled up by there
+    // being a dynamically sized array somewhere in there. In this circumstance,
+    // don't even attempt partial simpilfication. We'd probably have to double
+    // the size of simplification code in that case.
+    return expr2tc();
+  }
 }
 
 static const char *expr_names[] = {
   "constant_int",
   "constant_fixedbv",
+  "constant_floatbv",
   "constant_bool",
   "constant_string",
   "constant_struct",
@@ -517,6 +534,8 @@ static const char *expr_names[] = {
   "constant_array_of",
   "symbol",
   "typecast",
+  "bitcast",
+  "nearbyint",
   "if",
   "equality",
   "notequal",
@@ -543,6 +562,11 @@ static const char *expr_names[] = {
   "sub",
   "mul",
   "div",
+  "ieee_add",
+  "ieee_sub",
+  "ieee_mul",
+  "ieee_div",
+  "ieee_fma",
   "modulus",
   "shl",
   "ashr",
@@ -591,6 +615,8 @@ static const char *expr_names[] = {
   "cpp_throw_decl_end",
   "isinf",
   "isnormal",
+  "isfinite",
+  "signbit",
   "concat",
 };
 // If this fires, you've added/removed an expr id, and need to update the list
@@ -630,27 +656,27 @@ unsigned long
 constant_int2t::as_ulong(void) const
 {
   // XXXjmorse - add assertion that we don't exceed machine word width?
-  assert(!constant_value.is_negative());
-  return constant_value.to_ulong();
+  assert(!value.is_negative());
+  return value.to_ulong();
 }
 
 long
 constant_int2t::as_long(void) const
 {
   // XXXjmorse - add assertion that we don't exceed machine word width?
-  return constant_value.to_long();
+  return value.to_long();
 }
 
 bool
 constant_bool2t::is_true(void) const
 {
-  return constant_value;
+  return value;
 }
 
 bool
 constant_bool2t::is_false(void) const
 {
-  return !constant_value;
+  return !value;
 }
 
 std::string
@@ -829,6 +855,12 @@ type_poolt::get_fixedbv(const typet &val)
 }
 
 const type2tc &
+type_poolt::get_floatbv(const typet &val)
+{
+  return get_type_from_pool(val, floatbv_map);
+}
+
+const type2tc &
 type_poolt::get_string(const typet &val)
 {
   return get_type_from_pool(val, string_map);
@@ -899,6 +931,7 @@ type_to_string(const sideeffect_data::allockind &data,
                int indent __attribute__((unused)))
 {
   return (data == sideeffect_data::allockind::malloc) ? "malloc" :
+         (data == sideeffect_data::allockind::realloc) ? "realloc" :
          (data == sideeffect_data::allockind::alloca) ? "alloca" :
          (data == sideeffect_data::allockind::cpp_new) ? "cpp_new" :
          (data == sideeffect_data::allockind::cpp_new_arr) ? "cpp_new_arr" :
@@ -947,6 +980,12 @@ type_to_string(const BigInt &theint, int indent __attribute__((unused)))
 
 static inline __attribute__((always_inline)) std::string
 type_to_string(const fixedbvt &theval, int indent __attribute__((unused)))
+{
+  return theval.to_ansi_c_string();
+}
+
+static inline __attribute__((always_inline)) std::string
+type_to_string(const ieee_floatt &theval, int indent __attribute__((unused)))
 {
   return theval.to_ansi_c_string();
 }
@@ -1071,6 +1110,12 @@ do_type_cmp(const fixedbvt &side1, const fixedbvt &side2)
 }
 
 static inline __attribute__((always_inline)) bool
+do_type_cmp(const ieee_floatt &side1, const ieee_floatt &side2)
+{
+  return (side1 == side2) ? true : false;
+}
+
+static inline __attribute__((always_inline)) bool
 do_type_cmp(const std::vector<expr2tc> &side1,
             const std::vector<expr2tc> &side2)
 {
@@ -1187,6 +1232,16 @@ do_type_lt(const BigInt &side1, const BigInt &side2)
 
 static inline __attribute__((always_inline)) int
 do_type_lt(const fixedbvt &side1, const fixedbvt &side2)
+{
+  if (side1 < side2)
+    return -1;
+  else if (side1 > side2)
+    return 1;
+  return 0;
+}
+
+static inline __attribute__((always_inline)) int
+do_type_lt(const ieee_floatt &side1, const ieee_floatt &side2)
 {
   if (side1 < side2)
     return -1;
@@ -1418,6 +1473,21 @@ do_type_crc(const fixedbvt &theval, size_t seed)
 
 static inline __attribute__((always_inline)) void
 do_type_hash(const fixedbvt &theval, crypto_hash &hash)
+{
+
+  do_type_hash(theval.to_integer(), hash);
+  return;
+}
+
+static inline __attribute__((always_inline)) size_t
+do_type_crc(const ieee_floatt &theval, size_t seed)
+{
+  // TODO: Check if this is correct
+  return do_type_crc(theval.to_integer(), seed);
+}
+
+static inline __attribute__((always_inline)) void
+do_type_hash(const ieee_floatt &theval, crypto_hash &hash)
 {
 
   do_type_hash(theval.to_integer(), hash);
@@ -2049,9 +2119,9 @@ std::string empty_type2t::field_names [esbmct::num_type_fields]  =
 std::string symbol_type2t::field_names [esbmct::num_type_fields]  =
 { "symbol_name", "", "", "", ""};
 std::string struct_type2t::field_names [esbmct::num_type_fields]  =
-{ "members", "member_names", "typename", "", ""};
+{ "members", "member_names", "member_pretty_names", "typename", "", ""};
 std::string union_type2t::field_names [esbmct::num_type_fields]  =
-{ "members", "member_names", "typename", "", ""};
+{ "members", "member_names", "member_pretty_names", "typename", "", ""};
 std::string unsignedbv_type2t::field_names [esbmct::num_type_fields]  =
 { "width", "", "", "", ""};
 std::string signedbv_type2t::field_names [esbmct::num_type_fields]  =
@@ -2064,6 +2134,8 @@ std::string pointer_type2t::field_names [esbmct::num_type_fields]  =
 { "subtype", "", "", "", ""};
 std::string fixedbv_type2t::field_names [esbmct::num_type_fields]  =
 { "width", "integer_bits", "", "", ""};
+std::string floatbv_type2t::field_names [esbmct::num_type_fields]  =
+{ "fraction", "exponent", "", "", ""};
 std::string string_type2t::field_names [esbmct::num_type_fields]  =
 { "width", "", "", "", ""};
 std::string cpp_name_type2t::field_names [esbmct::num_type_fields]  =
@@ -2072,15 +2144,17 @@ std::string cpp_name_type2t::field_names [esbmct::num_type_fields]  =
 // Exprs
 
 std::string constant_int2t::field_names [esbmct::num_type_fields]  =
-{ "constant_value", "", "", "", ""};
+{ "value", "", "", "", ""};
 std::string constant_fixedbv2t::field_names [esbmct::num_type_fields]  =
+{ "value", "", "", "", ""};
+std::string constant_floatbv2t::field_names [esbmct::num_type_fields]  =
 { "value", "", "", "", ""};
 std::string constant_struct2t::field_names [esbmct::num_type_fields]  =
 { "members", "", "", "", ""};
 std::string constant_union2t::field_names [esbmct::num_type_fields]  =
 { "members", "", "", "", ""};
 std::string constant_bool2t::field_names [esbmct::num_type_fields]  =
-{ "constant_value", "", "", "", ""};
+{ "value", "", "", "", ""};
 std::string constant_array2t::field_names [esbmct::num_type_fields]  =
 { "members", "", "", "", ""};
 std::string constant_array_of2t::field_names [esbmct::num_type_fields]  =
@@ -2090,7 +2164,11 @@ std::string constant_string2t::field_names [esbmct::num_type_fields]  =
 std::string symbol2t::field_names [esbmct::num_type_fields]  =
 { "name", "renamelev", "level1_num", "level2_num", "thread_num", "node_num"};
 std::string typecast2t::field_names [esbmct::num_type_fields]  =
-{ "from", "", "", "", ""};
+{ "from", "rounding_mode", "", "", "", ""};
+std::string bitcast2t::field_names [esbmct::num_type_fields]  =
+{ "from", "rounding_mode", "", "", "", ""};
+std::string nearbyint2t::field_names [esbmct::num_type_fields]  =
+{ "from", "rounding_mode", "", "", "", ""};
 std::string if2t::field_names [esbmct::num_type_fields]  =
 { "cond", "true_value", "false_value", "", ""};
 std::string equality2t::field_names [esbmct::num_type_fields]  =
@@ -2143,6 +2221,16 @@ std::string mul2t::field_names [esbmct::num_type_fields]  =
 { "side_1", "side_2", "", "", ""};
 std::string div2t::field_names [esbmct::num_type_fields]  =
 { "side_1", "side_2", "", "", ""};
+std::string ieee_add2t::field_names [esbmct::num_type_fields]  =
+{ "side_1", "side_2", "rounding_mode", "", "", ""};
+std::string ieee_sub2t::field_names [esbmct::num_type_fields]  =
+{ "side_1", "side_2", "rounding_mode", "", "", ""};
+std::string ieee_mul2t::field_names [esbmct::num_type_fields]  =
+{ "side_1", "side_2", "rounding_mode", "", "", ""};
+std::string ieee_div2t::field_names [esbmct::num_type_fields]  =
+{ "side_1", "side_2", "rounding_mode", "", "", ""};
+std::string ieee_fma2t::field_names [esbmct::num_type_fields]  =
+{ "value_1", "value_2", "value_3", "rounding_mode", "", ""};
 std::string modulus2t::field_names [esbmct::num_type_fields]  =
 { "side_1", "side_2", "", "", ""};
 std::string shl2t::field_names [esbmct::num_type_fields]  =
@@ -2239,121 +2327,232 @@ std::string isinf2t::field_names [esbmct::num_type_fields]  =
 { "value", "", "", "", ""};
 std::string isnormal2t::field_names [esbmct::num_type_fields]  =
 { "value", "", "", "", ""};
+std::string isfinite2t::field_names [esbmct::num_type_fields]  =
+{ "value", "", "", "", ""};
+std::string signbit2t::field_names [esbmct::num_type_fields]  =
+{ "value", "", "", "", ""};
 std::string concat2t::field_names [esbmct::num_type_fields]  =
 { "forward", "aft", "", "", ""};
 
-// Explicit template instanciations
-
-template class esbmct::irep_methods2<bool_type2t, type2t, typename esbmct::type2t_default_traits::type>;
-template class esbmct::irep_methods2<empty_type2t, type2t, typename esbmct::type2t_default_traits::type>;
-template class esbmct::irep_methods2<symbol_type2t, symbol_type_data, symbol_type_data::traits::type>;
-template class esbmct::irep_methods2<struct_type2t, struct_union_data, struct_union_data::traits::type>;
-template class esbmct::irep_methods2<union_type2t, struct_union_data, struct_union_data::traits::type>;
-template class esbmct::irep_methods2<unsignedbv_type2t, bv_data, bv_data::traits::type>;
-template class esbmct::irep_methods2<signedbv_type2t, bv_data, bv_data::traits::type>;
-template class esbmct::irep_methods2<code_type2t, code_data, code_data::traits::type>;
-template class esbmct::irep_methods2<array_type2t, array_data, array_data::traits::type>;
-template class esbmct::irep_methods2<pointer_type2t, pointer_data, pointer_data::traits::type>;
-template class esbmct::irep_methods2<fixedbv_type2t, fixedbv_data, fixedbv_data::traits::type>;
-template class esbmct::irep_methods2<string_type2t, string_data, string_data::traits::type>;
-template class esbmct::irep_methods2<cpp_name_type2t, cpp_name_data, cpp_name_data::traits::type>;
-
-// Explicit instanciation for exprs.
-
-// XXX workaround: borrow a macro from irep2.h to avoid retyping all of this.
-// Use for explicit instantiation.
+// This has become particularly un-fun with the arrival of gcc 6.x and clang
+// 3.8 (roughly). Both are very aggressive wrt. whether templates are actually
+// instantiated or not, and refuse to instantiate template base classes
+// implicitly. Unfortunately, we relied on that before; it might still be
+// instantiating some of the irep_methods2 chain, but it's not doing the
+// method definitions, which leads to linking failures later.
+//
+// I've experimented with a variety of ways to implicitly require each method
+// of our template chain, but none seem to succeed, and the compiler goes a
+// long way out of it's path to avoid these instantiations. The real real
+// issue seems to be virtual functions, the compiler can jump through many
+// hoops to get method addresses out of the vtable, rather than having to
+// implicitly define it. One potential workaround may be a non-virtual method
+// that gets defined that calls all virtual methods explicitly?
+//
+// Anyway: the workaround is to explicitly instantiate each level of the
+// irep_methods2 hierarchy, with associated pain and suffering. This means
+// that our template system isn't completely variadic, you have to know how
+// many levels to instantiate when you reach this level, explicitly. Which
+// sucks, but is a small price to pay.
 
 #undef irep_typedefs
 #undef irep_typedefs_empty
 
-#define irep_typedefs(basename, superclass) \
-  template class esbmct::expr_methods2<basename##2t, superclass, superclass::traits::type>;
+#define irep_typedefs0(basename, superclass) \
+  template class esbmct::irep_methods2<basename##2t, superclass, superclass::traits::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename superclass::traits::type>::type>;
 
-#define irep_typedefs_empty(basename, superclass) \
-  template class  esbmct::expr_methods2<basename##2t, superclass, esbmct::expr2t_default_traits::type>;
+#define irep_typedefs1(basename, superclass) \
+  template class esbmct::irep_methods2<basename##2t, superclass, superclass::traits::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename superclass::traits::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>;
 
-irep_typedefs(constant_int, constant_int_data);
-irep_typedefs(constant_fixedbv, constant_fixedbv_data);
-irep_typedefs(constant_struct, constant_datatype_data);
-irep_typedefs(constant_union, constant_datatype_data);
-irep_typedefs(constant_array, constant_datatype_data);
-irep_typedefs(constant_bool, constant_bool_data);
-irep_typedefs(constant_array_of, constant_array_of_data);
-irep_typedefs(constant_string, constant_string_data);
-irep_typedefs(symbol, symbol_data);
-irep_typedefs(typecast,typecast_data);
-irep_typedefs(if, if_data);
-irep_typedefs(equality, relation_data);
-irep_typedefs(notequal, relation_data);
-irep_typedefs(lessthan, relation_data);
-irep_typedefs(greaterthan, relation_data);
-irep_typedefs(lessthanequal, relation_data);
-irep_typedefs(greaterthanequal, relation_data);
-irep_typedefs(not, not_data);
-irep_typedefs(and, logic_2ops);
-irep_typedefs(or, logic_2ops);
-irep_typedefs(xor, logic_2ops);
-irep_typedefs(implies, logic_2ops);
-irep_typedefs(bitand, bit_2ops);
-irep_typedefs(bitor, bit_2ops);
-irep_typedefs(bitxor, bit_2ops);
-irep_typedefs(bitnand, bit_2ops);
-irep_typedefs(bitnor, bit_2ops);
-irep_typedefs(bitnxor, bit_2ops);
-irep_typedefs(lshr, bit_2ops);
-irep_typedefs(bitnot, bitnot_data);
-irep_typedefs(neg, arith_1op);
-irep_typedefs(abs, arith_1op);
-irep_typedefs(add, arith_2ops);
-irep_typedefs(sub, arith_2ops);
-irep_typedefs(mul, arith_2ops);
-irep_typedefs(div, arith_2ops);
-irep_typedefs(modulus, arith_2ops);
-irep_typedefs(shl, arith_2ops);
-irep_typedefs(ashr, arith_2ops);
-irep_typedefs(same_object, same_object_data);
-irep_typedefs(pointer_offset, pointer_ops);
-irep_typedefs(pointer_object, pointer_ops);
-irep_typedefs(address_of, pointer_ops);
-irep_typedefs(byte_extract, byte_extract_data);
-irep_typedefs(byte_update, byte_update_data);
-irep_typedefs(with, with_data);
-irep_typedefs(member, member_data);
-irep_typedefs(index, index_data);
-irep_typedefs(isnan, isnan_data);
-irep_typedefs(overflow, overflow_ops);
-irep_typedefs(overflow_cast, overflow_cast_data);
-irep_typedefs(overflow_neg, overflow_ops);
-irep_typedefs_empty(unknown, expr2t);
-irep_typedefs_empty(invalid, expr2t);
-irep_typedefs_empty(null_object, expr2t);
-irep_typedefs(dynamic_object, dynamic_object_data);
-irep_typedefs(dereference, dereference_data);
-irep_typedefs(valid_object, object_ops);
-irep_typedefs(deallocated_obj, object_ops);
-irep_typedefs(dynamic_size, object_ops);
-irep_typedefs(sideeffect, sideeffect_data);
-irep_typedefs(code_block, code_block_data);
-irep_typedefs(code_assign, code_assign_data);
-irep_typedefs(code_init, code_assign_data);
-irep_typedefs(code_decl, code_decl_data);
-irep_typedefs(code_printf, code_printf_data);
-irep_typedefs(code_expression, code_expression_data);
-irep_typedefs(code_return, code_expression_data);
-irep_typedefs_empty(code_skip, expr2t);
-irep_typedefs(code_free, code_expression_data);
-irep_typedefs(code_goto, code_goto_data);
-irep_typedefs(object_descriptor, object_desc_data);
-irep_typedefs(code_function_call, code_funccall_data);
-irep_typedefs(code_comma, code_comma_data);
-irep_typedefs(invalid_pointer, invalid_pointer_ops);
-irep_typedefs(code_asm, code_asm_data);
-irep_typedefs(code_cpp_del_array, code_expression_data);
-irep_typedefs(code_cpp_delete, code_expression_data);
-irep_typedefs(code_cpp_catch, code_cpp_catch_data);
-irep_typedefs(code_cpp_throw, code_cpp_throw_data);
-irep_typedefs(code_cpp_throw_decl, code_cpp_throw_decl_data);
-irep_typedefs(code_cpp_throw_decl_end, code_cpp_throw_decl_data);
-irep_typedefs(isinf, isinf_data);
-irep_typedefs(isnormal, isinf_data);
-irep_typedefs(concat, bit_2ops);
+#define irep_typedefs2(basename, superclass) \
+  template class esbmct::irep_methods2<basename##2t, superclass, superclass::traits::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename superclass::traits::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>;
+
+#define irep_typedefs3(basename, superclass) \
+  template class esbmct::irep_methods2<basename##2t, superclass, superclass::traits::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename superclass::traits::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>::type>;
+
+#define irep_typedefs4(basename, superclass) \
+  template class esbmct::irep_methods2<basename##2t, superclass, superclass::traits::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename superclass::traits::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>::type>::type>;
+
+#define irep_typedefs5(basename, superclass) \
+  template class esbmct::irep_methods2<basename##2t, superclass, superclass::traits::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename superclass::traits::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>::type>::type>::type>;
+
+#define irep_typedefs6(basename, superclass) \
+  template class esbmct::irep_methods2<basename##2t, superclass, superclass::traits::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename superclass::traits::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>::type>::type>::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename boost::mpl::pop_front<typename superclass::traits::type>::type>::type>::type>::type>::type>::type>::type>;
+
+#define type_typedefs1(basename, superclass) irep_typedefs0(basename, superclass)
+#define type_typedefs2(basename, superclass) irep_typedefs1(basename, superclass)
+#define type_typedefs3(basename, superclass) irep_typedefs2(basename, superclass)
+#define type_typedefs4(basename, superclass) irep_typedefs3(basename, superclass)
+#define type_typedefs5(basename, superclass) irep_typedefs4(basename, superclass)
+#define type_typedefs6(basename, superclass) irep_typedefs5(basename, superclass)
+#define type_typedefs_empty(basename)\
+  template class esbmct::irep_methods2<basename##2t, type2t, esbmct::type2t_default_traits::type>;
+
+type_typedefs_empty(bool_type)
+type_typedefs_empty(empty_type)
+type_typedefs1(symbol_type, symbol_type_data)
+type_typedefs4(struct_type, struct_union_data)
+type_typedefs4(union_type, struct_union_data)
+type_typedefs1(unsignedbv_type, bv_data)
+type_typedefs1(signedbv_type, bv_data)
+type_typedefs4(code_type, code_data)
+type_typedefs3(array_type, array_data)
+type_typedefs1(pointer_type, pointer_data)
+type_typedefs2(fixedbv_type, fixedbv_data)
+type_typedefs1(string_type, string_data)
+type_typedefs2(cpp_name_type, cpp_name_data)
+
+// Explicit instanciation for exprs.
+
+#define expr_typedefs1(basename, superclass) \
+  template class esbmct::expr_methods2<basename##2t, superclass, superclass::traits::type>;\
+  irep_typedefs1(basename, superclass)
+
+#define expr_typedefs2(basename, superclass) \
+  template class esbmct::expr_methods2<basename##2t, superclass, superclass::traits::type>;\
+  irep_typedefs2(basename, superclass)
+
+#define expr_typedefs3(basename, superclass) \
+  template class esbmct::expr_methods2<basename##2t, superclass, superclass::traits::type>;\
+  irep_typedefs3(basename, superclass)
+
+#define expr_typedefs4(basename, superclass) \
+  template class esbmct::expr_methods2<basename##2t, superclass, superclass::traits::type>;\
+  irep_typedefs4(basename, superclass)
+
+#define expr_typedefs5(basename, superclass) \
+  template class esbmct::expr_methods2<basename##2t, superclass, superclass::traits::type>;\
+  irep_typedefs5(basename, superclass)
+
+#define expr_typedefs6(basename, superclass) \
+  template class esbmct::expr_methods2<basename##2t, superclass, superclass::traits::type>;\
+  irep_typedefs6(basename, superclass)
+
+#define expr_typedefs_empty(basename, superclass) \
+  template class esbmct::expr_methods2<basename##2t, superclass, esbmct::expr2t_default_traits::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, superclass::traits::type>;\
+  template class esbmct::irep_methods2<basename##2t, superclass, boost::mpl::pop_front<typename superclass::traits::type>::type>;
+
+expr_typedefs1(constant_int, constant_int_data);
+expr_typedefs1(constant_fixedbv, constant_fixedbv_data);
+irep_typedefs1(constant_floatbv, constant_floatbv_data);
+expr_typedefs1(constant_struct, constant_datatype_data);
+expr_typedefs1(constant_union, constant_datatype_data);
+expr_typedefs1(constant_array, constant_datatype_data);
+expr_typedefs1(constant_bool, constant_bool_data);
+expr_typedefs1(constant_array_of, constant_array_of_data);
+expr_typedefs1(constant_string, constant_string_data);
+expr_typedefs6(symbol, symbol_data);
+expr_typedefs2(nearbyint, typecast_data);
+expr_typedefs2(typecast,typecast_data);
+expr_typedefs2(bitcast,typecast_data);
+expr_typedefs3(if, if_data);
+expr_typedefs2(equality, relation_data);
+expr_typedefs2(notequal, relation_data);
+expr_typedefs2(lessthan, relation_data);
+expr_typedefs2(greaterthan, relation_data);
+expr_typedefs2(lessthanequal, relation_data);
+expr_typedefs2(greaterthanequal, relation_data);
+expr_typedefs1(not, not_data);
+expr_typedefs2(and, logic_2ops);
+expr_typedefs2(or, logic_2ops);
+expr_typedefs2(xor, logic_2ops);
+expr_typedefs2(implies, logic_2ops);
+expr_typedefs2(bitand, bit_2ops);
+expr_typedefs2(bitor, bit_2ops);
+expr_typedefs2(bitxor, bit_2ops);
+expr_typedefs2(bitnand, bit_2ops);
+expr_typedefs2(bitnor, bit_2ops);
+expr_typedefs2(bitnxor, bit_2ops);
+expr_typedefs2(lshr, bit_2ops);
+expr_typedefs1(bitnot, bitnot_data);
+expr_typedefs1(neg, arith_1op);
+expr_typedefs1(abs, arith_1op);
+expr_typedefs2(add, arith_2ops);
+expr_typedefs2(sub, arith_2ops);
+expr_typedefs2(mul, arith_2ops);
+expr_typedefs2(div, arith_2ops);
+expr_typedefs3(ieee_add, ieee_arith_2ops);
+expr_typedefs3(ieee_sub, ieee_arith_2ops);
+expr_typedefs3(ieee_mul, ieee_arith_2ops);
+expr_typedefs3(ieee_div, ieee_arith_2ops);
+expr_typedefs4(ieee_fma, ieee_arith_3ops);
+expr_typedefs2(modulus, arith_2ops);
+expr_typedefs2(shl, arith_2ops);
+expr_typedefs2(ashr, arith_2ops);
+expr_typedefs2(same_object, same_object_data);
+expr_typedefs1(pointer_offset, pointer_ops);
+expr_typedefs1(pointer_object, pointer_ops);
+expr_typedefs1(address_of, pointer_ops);
+expr_typedefs3(byte_extract, byte_extract_data);
+expr_typedefs4(byte_update, byte_update_data);
+expr_typedefs3(with, with_data);
+expr_typedefs2(member, member_data);
+expr_typedefs2(index, index_data);
+expr_typedefs1(isnan, arith_1op);
+expr_typedefs1(overflow, overflow_ops);
+expr_typedefs2(overflow_cast, overflow_cast_data);
+expr_typedefs1(overflow_neg, overflow_ops);
+expr_typedefs_empty(unknown, expr2t);
+expr_typedefs_empty(invalid, expr2t);
+expr_typedefs_empty(null_object, expr2t);
+expr_typedefs3(dynamic_object, dynamic_object_data);
+expr_typedefs2(dereference, dereference_data);
+expr_typedefs1(valid_object, object_ops);
+expr_typedefs1(deallocated_obj, object_ops);
+expr_typedefs1(dynamic_size, object_ops);
+expr_typedefs5(sideeffect, sideeffect_data);
+expr_typedefs1(code_block, code_block_data);
+expr_typedefs2(code_assign, code_assign_data);
+expr_typedefs2(code_init, code_assign_data);
+expr_typedefs1(code_decl, code_decl_data);
+expr_typedefs1(code_printf, code_printf_data);
+expr_typedefs1(code_expression, code_expression_data);
+expr_typedefs1(code_return, code_expression_data);
+expr_typedefs_empty(code_skip, expr2t);
+expr_typedefs1(code_free, code_expression_data);
+expr_typedefs1(code_goto, code_goto_data);
+expr_typedefs3(object_descriptor, object_desc_data);
+expr_typedefs3(code_function_call, code_funccall_data);
+expr_typedefs2(code_comma, code_comma_data);
+expr_typedefs1(invalid_pointer, invalid_pointer_ops);
+expr_typedefs1(code_asm, code_asm_data);
+expr_typedefs1(code_cpp_del_array, code_expression_data);
+expr_typedefs1(code_cpp_delete, code_expression_data);
+expr_typedefs1(code_cpp_catch, code_cpp_catch_data);
+expr_typedefs2(code_cpp_throw, code_cpp_throw_data);
+expr_typedefs2(code_cpp_throw_decl, code_cpp_throw_decl_data);
+expr_typedefs1(code_cpp_throw_decl_end, code_cpp_throw_decl_data);
+expr_typedefs1(isinf, arith_1op);
+expr_typedefs1(isnormal, arith_1op);
+expr_typedefs1(isfinite, arith_1op);
+expr_typedefs1(signbit, arith_1op);
+expr_typedefs2(concat, bit_2ops);

@@ -1,5 +1,6 @@
-SUBDIRS = cpp headers
-noinst_LTLIBRARIES = libansicscanner.la libansic.la libclib.la
+SUBDIRS = cpp
+
+noinst_LTLIBRARIES = libansicscanner.la libansic.la
 
 AM_CXXFLAGS = $(ESBMC_CXXFLAGS) -I$(top_srcdir) -I$(top_srcdir)/util
 AM_CFLAGS = $(ESBMC_CFLAGS) -I$(top_srcdir) -I$(top_srcdir)/util
@@ -26,25 +27,6 @@ libansic_la_SOURCES = parser.ypp \
 libansic_la_LIBADD = libansicscanner.la
 BUILT_SOURCES = parser.hpp
 
-
-noinst_PROGRAMS = c2goto
-c2goto_SOURCES = c2goto.cpp cprover_blank_library.cpp -I$(top_srcdir)/utils
-c2goto_LDADD = libansic.la libansicscanner.la @ESBMC_CLANG_ARCHIVES@ \
-      ../big-int/libbigint.a ../cpp/libcxx.la \
-      ../goto-programs/libgotoprograms.a ../langapi/liblangapi.a \
-      ../util/libutil.a cpp/libcpp.a ./headers/libheaders.a
-
-libclib_la_SOURCES = cprover_library.cpp clib32.c clib64.c
-
-clib32.c: c2goto $(srcdir)/library/*.c
-	./c2goto $(srcdir)/library/*.c --output clib32.goto
-	$(srcdir)/headers/flail.sh clib32 clib32.goto > $@
-
-clib64.c: c2goto $(srcdir)/library/*.c
-	./c2goto $(srcdir)/library/*.c --64 --output clib64.goto
-	$(srcdir)/headers/flail.sh clib64 clib64.goto > $@
-
 clean-local:
 	-rm scanner.cpp scanner.hpp parser.hpp parser.cpp
-	-rm clib64.goto clib32.goto clib64.c clib32.c
 .PHONY: clean-local

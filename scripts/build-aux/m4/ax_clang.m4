@@ -29,13 +29,7 @@ AC_DEFUN([AX_CLANG],
                 [ac_clang_lib_path=""]
         )
 
-    clang_lib_version_req=ifelse([$1], ,3.8.0,$1)
-    clang_lib_version_req_shorten=`expr $clang_lib_version_req : '\([[0-9]]*\.[[0-9]]*\)'`
-    clang_lib_version_req_major=`expr $clang_lib_version_req : '\([[0-9]]*\)'`
-    clang_lib_version_req_minor=`expr $clang_lib_version_req : '[[0-9]]*\.\([[0-9]]*\)'`
-    
-    WANT_clang_VERSION=`expr $clang_lib_version_req_major \* 100000 \+  $clang_lib_version_req_minor \* 100`
-    AC_MSG_CHECKING(for clang >= $clang_lib_version_req)
+    AC_MSG_CHECKING(for clang >= $1)
     succeeded=no
 
     dnl On 64-bit systems check for system libraries in both lib64 and lib.
@@ -119,104 +113,26 @@ AC_DEFUN([AX_CLANG],
         AC_MSG_RESULT(yes)
     fi
 
-    AC_MSG_CHECKING(if we can find libclangTooling)
-    if ls "$clang_libs_path/libclangTooling"* >/dev/null 2>&1 ; then
-         clang_LIBS="-lclangTooling"
-         AC_MSG_RESULT(yes)
-    else
-         AC_MSG_NOTICE([Can't find libclangTooling])
-         ifelse([$3], , :, [$3])
-    fi
+    dnl Look for clang libs
+    clanglibs="Tooling Driver Frontend Parse Serialization Sema Analysis Edit Lex AST Basic"
+    for lib in $clanglibs ; do
+        AC_MSG_CHECKING(if we can find libclang$lib)
+        if ls "$clang_libs_path/libclang$lib"* >/dev/null 2>&1 ; then
+            clang_LIBS="$clang_LIBS -lclang$lib"
+            AC_MSG_RESULT(yes)
+        else
+            AC_MSG_NOTICE([Can't find libclang$lib])
+            ifelse([$3], , :, [$3])
+        fi
+    done
 
-    AC_MSG_CHECKING(if we can find libclangDriver)
-    if ls "$clang_libs_path/libclangDriver"* >/dev/null 2>&1 ; then
-         clang_LIBS="$clang_LIBS -lclangDriver"
-         AC_MSG_RESULT(yes)
-    else
-         AC_MSG_NOTICE([Can't find libclangDriver])
-         ifelse([$3], , :, [$3])
+    dnl Search if clang was shipped with a symbolic link call libgomp.so
+    dnl We actually link with libgomp.so and this link breaks the old frontend
+    AC_MSG_CHECKING(if $clang_libs_path/libgomp.so is present)
+    if ls -L "$clang_libs_path/libgomp.so" >/dev/null 2>&1 ; then
+        AC_MSG_ERROR([Found libgomp.so on $clang_libs_path. ESBMC is linked against the GNU libgomp and the one shipped with clang is known to cause issues on our tool. Please, remove it before continuing.])
     fi
-
-    AC_MSG_CHECKING(if we can find libclangFrontend)
-    if ls "$clang_libs_path/libclangFrontend"* >/dev/null 2>&1 ; then
-         clang_LIBS="$clang_LIBS -lclangFrontend"
-         AC_MSG_RESULT(yes)
-    else
-         AC_MSG_NOTICE([Can't find libclangFrontend])
-         ifelse([$3], , :, [$3])
-    fi
-
-    AC_MSG_CHECKING(if we can find libclangParse)
-    if ls "$clang_libs_path/libclangParse"* >/dev/null 2>&1 ; then
-         clang_LIBS="$clang_LIBS -lclangParse"
-         AC_MSG_RESULT(yes)
-    else
-         AC_MSG_NOTICE([Can't find libclangParse])
-         ifelse([$3], , :, [$3])
-    fi
-
-    AC_MSG_CHECKING(if we can find libclangSerialization)
-    if ls "$clang_libs_path/libclangSerialization"* >/dev/null 2>&1 ; then
-         clang_LIBS="$clang_LIBS -lclangSerialization"
-         AC_MSG_RESULT(yes)
-    else
-         AC_MSG_NOTICE([Can't find libclangSerialization])
-         ifelse([$3], , :, [$3])
-    fi
-
-    AC_MSG_CHECKING(if we can find libclangSema)
-    if ls "$clang_libs_path/libclangSema"* >/dev/null 2>&1 ; then
-         clang_LIBS="$clang_LIBS -lclangSema"
-         AC_MSG_RESULT(yes)
-    else
-         AC_MSG_NOTICE([Can't find libclangSema])
-         ifelse([$3], , :, [$3])
-    fi
-
-    AC_MSG_CHECKING(if we can find libclangAnalysis)
-    if ls "$clang_libs_path/libclangAnalysis"* >/dev/null 2>&1 ; then
-         clang_LIBS="$clang_LIBS -lclangAnalysis"
-         AC_MSG_RESULT(yes)
-    else
-         AC_MSG_NOTICE([Can't find libclangAnalysis])
-         ifelse([$3], , :, [$3])
-    fi
-
-    AC_MSG_CHECKING(if we can find libclangEdit)
-    if ls "$clang_libs_path/libclangEdit"* >/dev/null 2>&1 ; then
-         clang_LIBS="$clang_LIBS -lclangEdit"
-         AC_MSG_RESULT(yes)
-    else
-         AC_MSG_NOTICE([Can't find libclangEdit])
-         ifelse([$3], , :, [$3])
-    fi
-
-    AC_MSG_CHECKING(if we can find libclangLex)
-    if ls "$clang_libs_path/libclangLex"* >/dev/null 2>&1 ; then
-         clang_LIBS="$clang_LIBS -lclangLex"
-         AC_MSG_RESULT(yes)
-    else
-         AC_MSG_NOTICE([Can't find libclangLex])
-         ifelse([$3], , :, [$3])
-    fi
-
-    AC_MSG_CHECKING(if we can find clangAST)
-    if ls "$clang_libs_path/libclangAST"* >/dev/null 2>&1 ; then
-         clang_LIBS="$clang_LIBS -lclangAST"
-         AC_MSG_RESULT(yes)
-    else
-         AC_MSG_NOTICE([Can't find libclangAST])
-         ifelse([$3], , :, [$3])
-    fi
-
-    AC_MSG_CHECKING(if we can find libclangBasic)
-    if ls "$clang_libs_path/libclangBasic"* >/dev/null 2>&1 ; then
-         clang_LIBS="$clang_LIBS -lclangBasic"
-         AC_MSG_RESULT(yes)
-    else
-         AC_MSG_NOTICE([Can't find libclangBasic])
-         ifelse([$3], , :, [$3])
-    fi
+    AC_MSG_RESULT(no)
 
     clang_CPPFLAGS="-I$clang_includes_path"
     clang_LDFLAGS="-L$clang_libs_path"

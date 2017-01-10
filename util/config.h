@@ -11,6 +11,7 @@ Author: Daniel Kroening, kroening@kroening.com
 
 #include "cmdline.h"
 #include "options.h"
+#include "ieee_float.h"
 
 class configt
 {
@@ -35,6 +36,8 @@ public:
     bool char_is_unsigned;
     bool use_fixed_for_float;
 
+    ieee_floatt::rounding_modet rounding_mode;
+
     void set_16();
     void set_32();
     void set_64();
@@ -49,8 +52,6 @@ public:
     ost os;
 
     std::list<std::string> defines;
-    std::list<std::string> undefines;
-    std::list<std::string> preprocessor_options;
     std::list<std::string> include_paths;
 
     typedef enum { LIB_NONE, LIB_FULL } libt;

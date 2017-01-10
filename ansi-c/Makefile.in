@@ -14,7 +14,6 @@
 
 @SET_MAKE@
 
-
 VPATH = @srcdir@
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
@@ -89,7 +88,6 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-noinst_PROGRAMS = c2goto$(EXEEXT)
 subdir = ansi-c
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps =  \
@@ -139,16 +137,6 @@ libansicscanner_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CXXLD) \
 	$(libansicscanner_la_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-libclib_la_LIBADD =
-am_libclib_la_OBJECTS = cprover_library.lo clib32.lo clib64.lo
-libclib_la_OBJECTS = $(am_libclib_la_OBJECTS)
-PROGRAMS = $(noinst_PROGRAMS)
-am_c2goto_OBJECTS = c2goto.$(OBJEXT) cprover_blank_library.$(OBJEXT)
-c2goto_OBJECTS = $(am_c2goto_OBJECTS)
-c2goto_DEPENDENCIES = libansic.la libansicscanner.la \
-	../big-int/libbigint.a ../cpp/libcxx.la \
-	../goto-programs/libgotoprograms.a ../langapi/liblangapi.a \
-	../util/libutil.a cpp/libcpp.a ./headers/libheaders.a
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -165,24 +153,6 @@ DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/scripts/build-aux/depcomp
 am__depfiles_maybe = depfiles
 am__mv = mv -f
-COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
-	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
-LTCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) \
-	$(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
-	$(AM_CFLAGS) $(CFLAGS)
-AM_V_CC = $(am__v_CC_@AM_V@)
-am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
-am__v_CC_0 = @echo "  CC      " $@;
-am__v_CC_1 = 
-CCLD = $(CC)
-LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-AM_V_CCLD = $(am__v_CCLD_@AM_V@)
-am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
-am__v_CCLD_0 = @echo "  CCLD    " $@;
-am__v_CCLD_1 = 
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
 LTCXXCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
@@ -218,10 +188,26 @@ AM_V_YACC = $(am__v_YACC_@AM_V@)
 am__v_YACC_ = $(am__v_YACC_@AM_DEFAULT_V@)
 am__v_YACC_0 = @echo "  YACC    " $@;
 am__v_YACC_1 = 
-SOURCES = $(libansic_la_SOURCES) $(libansicscanner_la_SOURCES) \
-	$(libclib_la_SOURCES) $(c2goto_SOURCES)
-DIST_SOURCES = $(libansic_la_SOURCES) $(libansicscanner_la_SOURCES) \
-	$(libclib_la_SOURCES) $(c2goto_SOURCES)
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+LTCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) \
+	$(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) \
+	$(AM_CFLAGS) $(CFLAGS)
+AM_V_CC = $(am__v_CC_@AM_V@)
+am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
+am__v_CC_0 = @echo "  CC      " $@;
+am__v_CC_1 = 
+CCLD = $(CC)
+LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CCLD = $(am__v_CCLD_@AM_V@)
+am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
+am__v_CCLD_0 = @echo "  CCLD    " $@;
+am__v_CCLD_1 = 
+SOURCES = $(libansic_la_SOURCES) $(libansicscanner_la_SOURCES)
+DIST_SOURCES = $(libansic_la_SOURCES) $(libansicscanner_la_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -463,8 +449,8 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = cpp headers
-noinst_LTLIBRARIES = libansicscanner.la libansic.la libclib.la
+SUBDIRS = cpp
+noinst_LTLIBRARIES = libansicscanner.la libansic.la
 AM_CXXFLAGS = $(ESBMC_CXXFLAGS) -I$(top_srcdir) -I$(top_srcdir)/util
 AM_CFLAGS = $(ESBMC_CFLAGS) -I$(top_srcdir) -I$(top_srcdir)/util
 AM_YFLAGS = -d -pyyansi_c
@@ -488,18 +474,11 @@ libansic_la_SOURCES = parser.ypp \
 
 libansic_la_LIBADD = libansicscanner.la
 BUILT_SOURCES = parser.hpp
-c2goto_SOURCES = c2goto.cpp cprover_blank_library.cpp -I$(top_srcdir)/utils
-c2goto_LDADD = libansic.la libansicscanner.la @ESBMC_CLANG_ARCHIVES@ \
-      ../big-int/libbigint.a ../cpp/libcxx.la \
-      ../goto-programs/libgotoprograms.a ../langapi/liblangapi.a \
-      ../util/libutil.a cpp/libcpp.a ./headers/libheaders.a
-
-libclib_la_SOURCES = cprover_library.cpp clib32.c clib64.c
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
 .SUFFIXES:
-.SUFFIXES: .c .cpp .lo .lpp .o .obj .ypp
+.SUFFIXES: .cpp .lo .lpp .o .obj .ypp
 $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -550,22 +529,6 @@ libansic.la: $(libansic_la_OBJECTS) $(libansic_la_DEPENDENCIES) $(EXTRA_libansic
 libansicscanner.la: $(libansicscanner_la_OBJECTS) $(libansicscanner_la_DEPENDENCIES) $(EXTRA_libansicscanner_la_DEPENDENCIES) 
 	$(AM_V_CXXLD)$(libansicscanner_la_LINK)  $(libansicscanner_la_OBJECTS) $(libansicscanner_la_LIBADD) $(LIBS)
 
-libclib.la: $(libclib_la_OBJECTS) $(libclib_la_DEPENDENCIES) $(EXTRA_libclib_la_DEPENDENCIES) 
-	$(AM_V_CXXLD)$(CXXLINK)  $(libclib_la_OBJECTS) $(libclib_la_LIBADD) $(LIBS)
-
-clean-noinstPROGRAMS:
-	@list='$(noinst_PROGRAMS)'; test -n "$$list" || exit 0; \
-	echo " rm -f" $$list; \
-	rm -f $$list || exit $$?; \
-	test -n "$(EXEEXT)" || exit 0; \
-	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
-	echo " rm -f" $$list; \
-	rm -f $$list
-
-c2goto$(EXEEXT): $(c2goto_OBJECTS) $(c2goto_DEPENDENCIES) $(EXTRA_c2goto_DEPENDENCIES) 
-	@rm -f c2goto$(EXEEXT)
-	$(AM_V_CXXLD)$(CXXLINK) $(c2goto_OBJECTS) $(c2goto_LDADD) $(LIBS)
-
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
@@ -578,7 +541,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ansi_c_parse_tree.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ansi_c_parser.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ansi_c_typecheck.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c2goto.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c_final.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c_link.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c_main.Plo@am__quote@
@@ -593,14 +555,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c_typecheck_initializer.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c_typecheck_type.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c_typecheck_typecast.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/clib32.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/clib64.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/convert_character_literal.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/convert_float_literal.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/convert_integer_literal.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/convert_string_literal.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cprover_blank_library.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cprover_library.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/expr2c.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fix_symbol.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libansicscanner_la-scanner.Plo@am__quote@
@@ -611,27 +569,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/trans_unit.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/type2name.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/unescape_string.Plo@am__quote@
-
-.c.o:
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ $<
-
-.c.obj:
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
-
-.c.lo:
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -830,7 +767,7 @@ distdir: $(DISTFILES)
 check-am: all-am
 check: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) check-recursive
-all-am: Makefile $(LTLIBRARIES) $(PROGRAMS)
+all-am: Makefile $(LTLIBRARIES)
 installdirs: installdirs-recursive
 installdirs-am:
 install: $(BUILT_SOURCES)
@@ -871,7 +808,7 @@ maintainer-clean-generic:
 clean: clean-recursive
 
 clean-am: clean-generic clean-libtool clean-local \
-	clean-noinstLTLIBRARIES clean-noinstPROGRAMS mostlyclean-am
+	clean-noinstLTLIBRARIES mostlyclean-am
 
 distclean: distclean-recursive
 	-rm -rf ./$(DEPDIR)
@@ -944,33 +881,24 @@ uninstall-am:
 
 .PHONY: $(am__recursive_targets) CTAGS GTAGS TAGS all all-am check \
 	check-am clean clean-generic clean-libtool clean-local \
-	clean-noinstLTLIBRARIES clean-noinstPROGRAMS cscopelist-am \
-	ctags ctags-am distclean distclean-compile distclean-generic \
-	distclean-libtool distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs installdirs-am maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-compile \
-	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	tags tags-am uninstall uninstall-am
+	clean-noinstLTLIBRARIES cscopelist-am ctags ctags-am distclean \
+	distclean-compile distclean-generic distclean-libtool \
+	distclean-tags distdir dvi dvi-am html html-am info info-am \
+	install install-am install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-html \
+	install-html-am install-info install-info-am install-man \
+	install-pdf install-pdf-am install-ps install-ps-am \
+	install-strip installcheck installcheck-am installdirs \
+	installdirs-am maintainer-clean maintainer-clean-generic \
+	mostlyclean mostlyclean-compile mostlyclean-generic \
+	mostlyclean-libtool pdf pdf-am ps ps-am tags tags-am uninstall \
+	uninstall-am
 
 .PRECIOUS: Makefile
 
 
-clib32.c: c2goto $(srcdir)/library/*.c
-	./c2goto $(srcdir)/library/*.c --output clib32.goto
-	$(srcdir)/headers/flail.sh clib32 clib32.goto > $@
-
-clib64.c: c2goto $(srcdir)/library/*.c
-	./c2goto $(srcdir)/library/*.c --64 --output clib64.goto
-	$(srcdir)/headers/flail.sh clib64 clib64.goto > $@
-
 clean-local:
 	-rm scanner.cpp scanner.hpp parser.hpp parser.cpp
-	-rm clib64.goto clib32.goto clib64.c clib32.c
 .PHONY: clean-local
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.

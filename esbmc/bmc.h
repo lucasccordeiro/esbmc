@@ -40,22 +40,15 @@ public:
     interleaving_failed = 0;
     uw_loop = 0;
 
-    const symbolt *sp;
-    if (ns.lookup(irep_idt("c::__ESBMC_alloc"), sp))
-      is_cpp = true;
-    else
-      is_cpp = false;
-
     ltl_results_seen[ltl_res_bad] = 0;
     ltl_results_seen[ltl_res_failing] = 0;
     ltl_results_seen[ltl_res_succeeding] = 0;
     ltl_results_seen[ltl_res_good] = 0;
 
-    runtime_solver = create_solver_factory("", is_cpp,
-                                           opts.get_bool_option("int-encoding"),
-                                           ns, options);
-
     if (options.get_bool_option("smt-during-symex")) {
+      runtime_solver = create_solver_factory(
+        "", opts.get_bool_option("int-encoding"), ns, options);
+
       symex =
         new reachability_treet(
           funcs,
@@ -90,7 +83,6 @@ public:
   unsigned int interleaving_number;
   unsigned int interleaving_failed;
   unsigned int uw_loop;
-  bool is_cpp;
 
   virtual bool run(void);
   virtual ~bmct() { }
@@ -121,6 +113,7 @@ protected:
 
   virtual void error_trace(
     smt_convt &smt_conv, symex_target_equationt &equation);
+  virtual void successful_trace(symex_target_equationt &equation);
     bool run_thread();
     int ltl_run_thread(symex_target_equationt *equation);
 };

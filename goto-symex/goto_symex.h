@@ -195,6 +195,16 @@ protected:
   void symex_other(void);
 
   /**
+   *  Interpret an ASSUME instruction.
+   */
+  void symex_assume(void);
+
+  /**
+   *  Interpret an ASSERT instruction.
+   */
+  void symex_assert(void);
+
+  /**
    *  Perform an assertion.
    *  Encodes an assertion that the expression claimed is always true. This
    *  adds the requirement that the current state guard is true as well.
@@ -364,10 +374,6 @@ protected:
    */
   void run_intrinsic(const code_function_call2t &call, reachability_treet &art,
                      const std::string symname);
-
-  /** Implementation of realloc. */
-  void intrinsic_realloc(const code_function_call2t &call,
-                         reachability_treet &arg);
 
   /** Perform yield; forces a context switch point. */
   void intrinsic_yield(reachability_treet &arg);
@@ -569,6 +575,8 @@ protected:
 
   /** Symbolic implementation of malloc. */
   expr2tc symex_malloc(const expr2tc &lhs, const sideeffect2t &code);
+  /** Implementation of realloc. */
+  void symex_realloc(const expr2tc &lhs, const sideeffect2t &code);
   /** Symbolic implementation of alloca. */
   expr2tc symex_alloca(const expr2tc &lhs, const sideeffect2t &code);
   /** Wrapper around for alloca and malloc. */
@@ -614,6 +622,8 @@ protected:
    */
   irep_idt guard_identifier_s;
 
+  /** Loop numbers. */
+  std::stack<unsigned> loop_numbers;
   /** Number of assertions executed. */
   unsigned total_claims;
   /** Number of assertions remaining to be discharged. */

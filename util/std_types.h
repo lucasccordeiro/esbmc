@@ -12,7 +12,8 @@ Author: Daniel Kroening, kroening@kroening.com
 #include <assert.h>
 
 #include <type.h>
-#include <expr.h>
+#include <std_expr.h>
+#include <mp_arith.h>
 
 class bool_typet:public typet
 {
@@ -104,6 +105,16 @@ public:
     inline componentt(const irep_idt &_name, const typet &_type):exprt(a_component)
     {
       set_name(_name);
+      type()=_type;
+    }
+
+    inline componentt(
+      const irep_idt &_name,
+      const irep_idt &_pretty_name,
+      const typet &_type) : exprt(a_component)
+    {
+      set_name(_name);
+      set_pretty_name(_pretty_name);
       type()=_type;
     }
 
@@ -470,6 +481,12 @@ public:
     id(t_unsignedbv);
     set_width(width);
   }
+
+  mp_integer smallest() const;
+  mp_integer largest() const;
+  constant_exprt smallest_expr() const;
+  constant_exprt zero_expr() const;
+  constant_exprt largest_expr() const;
 };
 
 /*! \brief Cast a generic typet to an \ref unsignedbv_typet
@@ -510,6 +527,12 @@ public:
     id(t_signedbv);
     set_width(width);
   }
+
+  mp_integer smallest() const;
+  mp_integer largest() const;
+  constant_exprt smallest_expr() const;
+  constant_exprt zero_expr() const;
+  constant_exprt largest_expr() const;
 };
 
 
@@ -576,7 +599,7 @@ public:
 
   unsigned get_e() const
   {
-    return get_width()-get_f();
+    return get_width()-get_f()-1;
   }
 
   unsigned get_f() const;

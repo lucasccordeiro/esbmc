@@ -77,8 +77,6 @@ static void internal_additions(std::string &code)
     "_Bool __ESBMC_is_dynamic[__ESBMC_constant_infinity_uint];\n"
     "unsigned long __ESBMC_alloc_size[__ESBMC_constant_infinity_uint];\n"
 
-    "void *__ESBMC_realloc(void *ptr, long unsigned int size);\n"
-
     // this is ANSI-C
     "extern const char __func__[];\n"
 
@@ -87,7 +85,7 @@ static void internal_additions(std::string &code)
     "_Bool __ESBMC_isfinite(double f);\n"
     "_Bool __ESBMC_isinf(double f);\n"
     "_Bool __ESBMC_isnormal(double f);\n"
-    "extern int __ESBMC_rounding_mode;\n"
+    "int __ESBMC_rounding_mode = 0;\n"
 
     // absolute value
     "int __ESBMC_abs(int x);\n"

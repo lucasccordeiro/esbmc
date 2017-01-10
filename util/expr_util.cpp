@@ -10,6 +10,7 @@ Author: Daniel Kroening, kroening@kroening.com
 #include "fixedbv.h"
 #include "bitvector.h"
 #include "std_expr.h"
+#include "ieee_float.h"
 
 exprt gen_zero(const typet &type)
 {
@@ -24,10 +25,7 @@ exprt gen_zero(const typet &type, bool array_as_array_of)
 
   result=exprt("constant", type);
 
-  if(type_id=="rational" ||
-     type_id=="real" ||
-     type_id=="integer" ||
-     type_id=="natural" ||
+  if(type_id=="real" ||
      type_id=="complex")
   {
     result.value("0");
@@ -98,10 +96,7 @@ exprt gen_one(const typet &type)
   exprt result=exprt("constant", type);
 
   if(type_id=="bool" ||
-     type_id=="rational" ||
      type_id=="real" ||
-     type_id=="integer" ||
-     type_id=="natural" ||
      type_id=="complex")
   {
     result.value("1");
@@ -124,8 +119,10 @@ exprt gen_one(const typet &type)
   }
   else if(type_id=="floatbv")
   {
-    std::cerr << "floatbv unsupported, sorry" << std::endl;
-    abort();
+    ieee_floatt ieee_float;
+    ieee_float.spec=to_floatbv_type(type);
+    ieee_float.from_integer(1);
+    result=ieee_float.to_expr();
   }
   else
     result.make_nil();

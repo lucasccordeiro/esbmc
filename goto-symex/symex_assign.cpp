@@ -68,19 +68,10 @@ goto_symext::goto_symext(const namespacet &_ns, contextt &_new_context,
 
   art1 = NULL;
 
-  // Work out whether or not we'll be modelling with cpp:: or c:: arrays.
-  const symbolt *sp;
-  if (!ns.lookup(irep_idt("c::__ESBMC_alloc"), sp)) {
-    valid_ptr_arr_name = "c::__ESBMC_alloc";
-    alloc_size_arr_name = "c::__ESBMC_alloc_size";
-    deallocd_arr_name = "c::__ESBMC_deallocated";
-    dyn_info_arr_name = "c::__ESBMC_is_dynamic";
-  } else {
-    valid_ptr_arr_name = "cpp::__ESBMC_alloc";
-    alloc_size_arr_name = "cpp::__ESBMC_alloc_size";
-    deallocd_arr_name = "cpp::__ESBMC_deallocated";
-    dyn_info_arr_name = "cpp::__ESBMC_is_dynamic";
-  }
+  valid_ptr_arr_name = "c::__ESBMC_alloc";
+  alloc_size_arr_name = "c::__ESBMC_alloc_size";
+  deallocd_arr_name = "c::__ESBMC_deallocated";
+  dyn_info_arr_name = "c::__ESBMC_is_dynamic";
 
   symbolt sym;
   sym.name = "symex_throw::thrown_obj";
@@ -121,6 +112,7 @@ goto_symext& goto_symext::operator=(const goto_symext &sym)
   base_case = sym.base_case;
   forward_condition = sym.forward_condition;
   inductive_step = sym.inductive_step;
+  loop_numbers = sym.loop_numbers;
 
   valid_ptr_arr_name = sym.valid_ptr_arr_name;
   alloc_size_arr_name = sym.alloc_size_arr_name;
@@ -192,6 +184,9 @@ void goto_symext::symex_assign(const expr2tc &code_assign)
     case sideeffect2t::cpp_new_arr:
       symex_cpp_new(lhs, effect);
       break;
+    case sideeffect2t::realloc:
+      symex_realloc(lhs, effect);
+      break;
     case sideeffect2t::malloc:
       symex_malloc(lhs, effect);
       break;
@@ -224,7 +219,7 @@ void goto_symext::symex_assign_rec(
     symex_assign_member(lhs, rhs, guard);
   } else if (is_if2t(lhs)) {
     symex_assign_if(lhs, rhs, guard);
-  } else if (is_typecast2t(lhs)) {
+  } else if (is_typecast2t(lhs) || is_bitcast2t(lhs)) {
     symex_assign_typecast(lhs, rhs, guard);
    } else if (is_constant_string2t(lhs) ||
            is_null_object2t(lhs))
@@ -307,9 +302,14 @@ void goto_symext::symex_assign_typecast(
 {
   // these may come from dereferencing on the lhs
 
-  const typecast2t &cast = to_typecast2t(lhs);
+  const typecast_data &cast = dynamic_cast<const typecast_data&>(*lhs.get());
   expr2tc rhs_typecasted = rhs;
-  rhs_typecasted = typecast2tc(cast.from->type, rhs);
+  if (is_typecast2t(lhs)) {
+    rhs_typecasted = typecast2tc(cast.from->type, rhs);
+  } else {
+    assert(is_bitcast2t(lhs));
+    rhs_typecasted = bitcast2tc(cast.from->type, rhs);
+  }
 
   symex_assign_rec(cast.from, rhs_typecasted, guard);
 }
@@ -455,32 +455,58 @@ void goto_symext::symex_assign_concat(
   guardt &guard)
 {
   // Right: generate a series of symex assigns.
+#ifndef NDEBUG
   const concat2t &cat = to_concat2t(lhs);
   assert(cat.type->get_width() > 8);
+#endif
   assert(is_scalar_type(rhs));
 
-  // Ensure we're dealing with a bitvector.
-  if (!is_bv_type(rhs))
-    rhs = typecast2tc(get_uint_type(rhs->type->get_width()), rhs);
+  // Second attempt at this code: byte stitching guarantees that all the concats
+  // occur in one large grouping. Produce a list of them.
+  std::list<expr2tc> operand_list;
+  expr2tc cur_concat = lhs;
+  while (is_concat2t(cur_concat)) {
+    const concat2t &cat2 = to_concat2t(cur_concat);
+    operand_list.push_back(cat2.side_2);
+    cur_concat = cat2.side_1;
+  }
 
-  // Right. To split this up, work out the size that should be being assigned
-  // to each part of the contact, and cut up the rhs appropriately.
-  unsigned int side1_size = cat.side_1->type->get_width();
-  unsigned int side2_size = cat.side_2->type->get_width();
+  // Add final operand to list
+  operand_list.push_back(cur_concat);
 
-  // Position to split it is side2_size bits up from the zero position. Now,
-  // perform this split.
-  // Side2 rhs takes the lower bits, so just downcast the rhs to that num of bit
-  expr2tc side2_rhs = typecast2tc(get_uint_type(side2_size), rhs);
-  // Side1 needs to have that number of lower bits clipped off.
-  expr2tc shift_dist = gen_uint(rhs->type, side2_size);
-  expr2tc side1_rhs = lshr2tc(rhs->type, rhs, shift_dist);
-  // Now downcast it to the desired number of bits.
-  side1_rhs = typecast2tc(get_uint_type(side1_size), side1_rhs);
+#ifndef NDEBUG
+  for (const auto &foo : operand_list)
+    assert(foo->type->get_width() == 8);
+#endif
+  assert((operand_list.size() * 8) == cat.type->get_width());
 
-  // And now, perform the new assignments.
-  symex_assign_rec(cat.side_1, side1_rhs, guard);
-  symex_assign_rec(cat.side_2, side2_rhs, guard);
+  bool is_big_endian =
+      (config.ansi_c.endianess == configt::ansi_ct::IS_BIG_ENDIAN);
+
+  // Pin one set of rhs version numbers: if we assign part of a value to itself,
+  // it'll change during the assignment
+  cur_state->rename(rhs);
+
+  // Produce a corresponding set of byte extracts from the rhs value. Note that
+  // the byte offset is always the same no matter endianness here, any byte
+  // order flipping is handled at the smt layer.
+  std::list<expr2tc> extracts;
+  for (unsigned int i = 0; i < operand_list.size(); i++) {
+    byte_extract2tc byte(get_uint_type(8), rhs, gen_ulong(i), is_big_endian);
+    extracts.push_back(byte);
+  }
+
+  // Now proceed to pair them up
+  assert(extracts.size() == operand_list.size());
+  auto lhs_it = operand_list.begin();
+  auto rhs_it = extracts.begin();
+  while (lhs_it != operand_list.end()) {
+    symex_assign_rec(*lhs_it, *rhs_it, guard);
+    lhs_it++;
+    rhs_it++;
+  }
+
+  return;
 }
 
 void goto_symext::replace_nondet(expr2tc &expr)

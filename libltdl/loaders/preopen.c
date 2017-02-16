@@ -1,1 +1,0 @@
-/usr/share/libtool/loaders/preopen.c

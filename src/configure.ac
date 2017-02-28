@@ -75,7 +75,7 @@ AS_VAR_SET(C2GOTO_LIBS, "")
 AM_PROG_AR
 AM_PROG_LEX
 
-LT_INIT(static disable-shared)
+LT_INIT(static shared)
 LTDL_INIT
 
 AC_LANG(C++)
@@ -114,7 +114,7 @@ AC_CHECK_LIB([crypto], [SHA1_Init],
 
 # Define what to do when clang is enabled
 m4_define(ESBMC_ENABLE_CLANG, [
-  AX_CLANG(3.9.0, [], AC_MSG_ERROR([Cannot find clang lib dir; please pass it in --with-clang-libdir argument or set CLANG_ROOT]))
+  AX_CLANG(3.9.0, [], AC_MSG_ERROR([Cannot find clang lib dir; please pass it in --with-clang argument or set CLANG_ROOT]))
   AX_LLVM(,AC_MSG_FAILURE(Cannot find llvm dir, please pass it in --with-llvm argument))
   AC_SUBST([ESBMC_CLANG_SUBDIRS], " clang-c-frontend clang-cpp-frontend ")
   AC_SUBST([ESBMC_CLANG_ARCHIVES], " ../clang-c-frontend/libclangcfrontend.la ../clang-cpp-frontend/libclangcppfrontend.la ../clang-c-frontend/headers/libclangheaders.la")
@@ -201,9 +201,13 @@ LT_LIB_DLLOAD
 
 AC_ARG_ENABLE(static-link, [AS_HELP_STRING([--enable-static-link], Build a static version of esbmc)])
 AS_VAR_SET(ESBMC_LDFLAGS, "")
+AS_VAR_SET(LIBESBMC_LDFLAGS, "")
 AS_IF([test "${enable_static_link}" = "yes"], [
   AS_VAR_SET(ESBMC_LDFLAGS, " -all-static ")
+], [
+    AS_VAR_SET(LIBESBMC_LDFLAGS, " -shared ")
 ])
+AC_SUBST([LIBESBMC_LDFLAGS], $LIBESBMC_LDFLAGS)
 AC_SUBST([ESBMC_LDFLAGS], $ESBMC_LDFLAGS)
 
 AC_ARG_ENABLE(werror, [AS_HELP_STRING([--disable-werror], Disable werror build flag)])
@@ -212,12 +216,7 @@ dnl on by default...
 AC_ARG_ENABLE(enable-esbmc, [AS_HELP_STRING([--enable-esbmc], Build main ESBMC binary)])
 AS_IF([test "${enable_esbmc}" = "yes"], [
   AC_SUBST([ESBMC_BINARY], "esbmc")
-], [
-  dnl If we turn esbmc off, disable creation of any statc objects
-  AS_IF([test "${enable_esbmc}" = "no"], [
-    AS_VAR_SET(enable_static, "no")
-  ])
-])
+], [])
 
 AC_ARG_ENABLE(enable-python, [AS_HELP_STRING([--enable-python], Build python support into ESBMC)])
 AS_IF([test "${enable_python}" = "yes"], [
@@ -287,11 +286,11 @@ AS_IF([test "${enable_python}" = "yes"], [
     AC_SUBST([ESBMC_PYTHON_OBJ], "")
 ])
 
-dnl If --enable-shared was supplied, then enable building of libesbmc.
-AS_IF([test "${enable_shared}" = "yes"], [
-  AC_SUBST([ESBMC_SHARED_LIB], "libesbmc.la")
+dnl If --enable-libesbmc was supplied, then enable building of libesbmc.
+AS_IF([test "${enable_libesbmc}" = "yes"], [
+  AC_SUBST([ESBMC_LIB], "libesbmc.la")
 ], [
-  AC_SUBST([ESBMC_SHARED_LIB], "")
+  AC_SUBST([ESBMC_LIB], "")
 ])
 
 AS_VAR_SET(BASE_CXXFLAGS, "-Wall -Wextra -W -std=c++11 $ESBMC_CLANG_CXXFLAGS ")
@@ -486,9 +485,9 @@ m4_define(z3_possible_libdirs, [lib, bin, x64])
 dnl Only boolector 1.6 and later are supported -- prior versions of boolector
 dnl do not have a structure for knowing where lingeling / minisat are.
 
-m4_define(btor_build_headers, [boolector/boolector.h])
+m4_define(btor_build_headers, [boolector/src/boolector.h])
 m4_define(btor_possible_locs, [$SATDIR64/boolector, $SATDIR32/boolector, $SATDIR/boolector, $HOME/boolector])
-m4_define(btor_possible_libdirs, [boolector])
+m4_define(btor_possible_libdirs, [boolector/build])
 
 m4_define(yices_build_headers, [include/yices.h])
 m4_define(yices_possible_locs, [$SATDIR64/yices, $SATDIR32/yices, $SATDIR/yices, $HOME/yices])
@@ -544,7 +543,7 @@ ESBMC_OPTIONAL_SOLVER([z3_possible_locs], [z3_build_headers], z3, z3, Z3_mk_cont
 ])
 
 AS_IF([test "$esbmc_disable_solver_boolector" != "yes"], [
-ESBMC_OPTIONAL_SOLVER([btor_possible_locs], [btor_build_headers], boolector, boolector, boolector_new, boolector, [btor_possible_libdirs], $$ESBMC_BOOLECTOR_EXTRA_CONFIG)
+ESBMC_OPTIONAL_SOLVER([btor_possible_locs], [btor_build_headers], boolector, boolector, boolector_new, boolector/src, [btor_possible_libdirs], $$ESBMC_BOOLECTOR_EXTRA_CONFIG)
 ])
 
 AS_IF([test "$esbmc_disable_solver_yices" != "yes"], [

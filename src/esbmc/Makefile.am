@@ -2,7 +2,7 @@
 EXTRA_PROGRAMS = esbmc
 bin_PROGRAMS = @ESBMC_BINARY@
 EXTRA_LTLIBRARIES = libesbmc.la
-lib_LTLIBRARIES = @ESBMC_SHARED_LIB@
+lib_LTLIBRARIES = @ESBMC_LIB@
 noinst_LTLIBRARIES = libmain.la
 
 # Work out what gets linked in.
@@ -30,7 +30,7 @@ EXTRA_libmain_la_SOURCES = python.cpp
 
 # libesbmc -> shared object of all of ESBMCs Stuff (TM)
 # -rpath needed otherwise libtool bails on making it shared.
-libesbmc_la_LDFLAGS = -module -shared -rpath ${libdir} -release @ESBMC_VERSION_STR@
+libesbmc_la_LDFLAGS = -module @LIBESBMC_LDFLAGS@ -rpath ${libdir} -release @ESBMC_VERSION_STR@
 libesbmc_la_LIBADD = $(libs_to_link_in) $(ESBMC_SOLVER_LIBS) ./libmain.la @ESBMC_PYTHON_OBJ@
 libesbmc_la_SOURCES = ltbuildidstring.c
 EXTRA_libesbmc_la_DEPENDENCIES = @ESBMC_PYTHON_OBJ@

@@ -1,16 +1,13 @@
-#include <sstream>
-#include <set>
 #include <iomanip>
-
-#include <base_type.h>
-#include <arith_tools.h>
-#include <c_types.h>
-#include <expr_util.h>
-
-#include "smt_conv.h"
+#include <set>
 #include <solvers/prop/literal.h>
-
-#include "smt_tuple_flat.h"
+#include <solvers/smt/smt_conv.h>
+#include <solvers/smt/smt_tuple_flat.h>
+#include <sstream>
+#include <util/arith_tools.h>
+#include <util/base_type.h>
+#include <util/c_types.h>
+#include <util/expr_util.h>
 
 // Helpers extracted from z3_convt.
 
@@ -1836,37 +1833,7 @@ smt_convt::calculate_array_domain_width(const array_type2t &arr)
 smt_sortt
 smt_convt::make_array_domain_sort(const array_type2t &arr)
 {
-
-  // Start special casing if this is an array of arrays.
-  if (!is_array_type(arr.subtype)) {
-    // Normal array, work out what the domain sort is.
-    unsigned int domain_width = calculate_array_domain_width(arr);
-    return mk_int_bv_sort(domain_width);
-  } else {
-    // This is an array of arrays -- we're going to convert this into a single
-    // array that has an extended domain. Work out that width. Firstly, how
-    // many levels of array do we have?
-
-    unsigned int how_many_arrays = 1;
-    type2tc subarr = arr.subtype;
-    while (is_array_type(subarr)) {
-      how_many_arrays++;
-      subarr = to_array_type(subarr).subtype;
-    }
-
-    assert(how_many_arrays < 64 && "Suspiciously large number of array "
-                                   "dimensions");
-    unsigned int domwidth;
-    unsigned int i;
-    domwidth = calculate_array_domain_width(arr);
-    subarr = arr.subtype;
-    for (i = 1; i < how_many_arrays; i++) {
-      domwidth += calculate_array_domain_width(to_array_type(arr.subtype));
-      subarr = arr.subtype;
-    }
-
-    return mk_sort(SMT_SORT_BV, domwidth, false);
-  }
+  return mk_sort(int_encoding ? SMT_SORT_INT : SMT_SORT_BV, make_array_domain_sort_exp(arr)->get_width(), false);
 }
 
 type2tc
@@ -1880,27 +1847,19 @@ smt_convt::make_array_domain_sort_exp(const array_type2t &arr)
       return get_uint_type(config.ansi_c.int_width);
     else
       return get_uint_type(calculate_array_domain_width(arr));
-  } else {
+  }
+  else
+  {
     // This is an array of arrays -- we're going to convert this into a single
-    // array that has an extended domain. Work out that width. Firstly, how
-    // many levels of array do we have?
+    // array that has an extended domain. Work out that width.
 
-    unsigned int how_many_arrays = 1;
+    unsigned int domwidth = calculate_array_domain_width(arr);
+
     type2tc subarr = arr.subtype;
-    while (is_array_type(subarr)) {
-      how_many_arrays++;
+    while(is_array_type(subarr))
+    {
+      domwidth += calculate_array_domain_width(to_array_type(subarr));
       subarr = to_array_type(subarr).subtype;
-    }
-
-    assert(how_many_arrays < 64 && "Suspiciously large number of array "
-                                   "dimensions");
-    unsigned int domwidth;
-    unsigned int i;
-    domwidth = calculate_array_domain_width(arr);
-    subarr = arr.subtype;
-    for (i = 1; i < how_many_arrays; i++) {
-      domwidth += calculate_array_domain_width(to_array_type(arr.subtype));
-      subarr = arr.subtype;
     }
 
     return get_uint_type(domwidth);
@@ -2595,9 +2554,9 @@ smt_ast::update(smt_convt *ctx, smt_astt value, unsigned int idx,
   // We're an array; just generate a 'with' operation.
   expr2tc index;
   if (is_nil_expr(idx_expr)) {
-    unsigned int dom_width = ctx->int_encoding ? 32 : sort->domain_width;
-    index = constant_int2tc(type2tc(new unsignedbv_type2t(dom_width)),
-          BigInt(idx));
+    size_t dom_width = ctx->int_encoding ? config.ansi_c.int_width : sort->domain_width;
+    index =
+      constant_int2tc(type2tc(new unsignedbv_type2t(dom_width)), BigInt(idx));
   } else {
     index = idx_expr;
   }
@@ -2633,7 +2592,7 @@ smt_ast::project(smt_convt *ctx __attribute__((unused)),
   abort();
 }
 
-void smt_convt::dump_SMT()
+void smt_convt::dump_smt()
 {
   std::cerr << "SMT dump not implemented for " << solver_text() << "\n";
 }

@@ -5,26 +5,25 @@
 
  \*******************************************************************/
 
-#include <assert.h>
-#include <ctype.h>
+#include <cassert>
+#include <cctype>
 #include <fstream>
 #include <sstream>
-#include <std_expr.h>
-#include <irep2.h>
-#include <migrate.h>
-#include <arith_tools.h>
-#include <std_types.h>
-#include <config.h>
-#include <i2string.h>
-#include <expr_util.h>
-#include <string2array.h>
-#include <type_byte_size.h>
-#include <prefix.h>
-#include <fixedbv.h>
-#include <base_type.h>
-#include <c_types.h>
-
-#include "z3_conv.h"
+#include <util/arith_tools.h>
+#include <util/base_type.h>
+#include <util/c_types.h>
+#include <util/config.h>
+#include <util/expr_util.h>
+#include <util/fixedbv.h>
+#include <util/i2string.h>
+#include <util/irep2.h>
+#include <util/migrate.h>
+#include <util/prefix.h>
+#include <util/std_expr.h>
+#include <util/std_types.h>
+#include <util/string2array.h>
+#include <util/type_byte_size.h>
+#include <z3_conv.h>
 
 #ifdef DEBUG
 #define DEBUGLOC std::cout << std::endl << __FUNCTION__ << \
@@ -199,7 +198,7 @@ z3_convt::check2_z3_properties(void)
   if (result == z3::sat)
     model = solver.get_model();
 
-  if (config.options.get_bool_option("dump-z3-assigns") && result == z3::sat)
+  if (config.options.get_bool_option("show-smt-model") && result == z3::sat)
     std::cout << Z3_model_to_string(ctx, model);
 
   return result;
@@ -1005,24 +1004,14 @@ const smt_ast *
 z3_smt_ast::update(smt_convt *conv, const smt_ast *value,
                    unsigned int idx, expr2tc idx_expr) const
 {
-
   expr2tc index;
 
-  if (sort->id == SMT_SORT_ARRAY) {
-    if (is_nil_expr(idx_expr)) {
-      unsigned int dom_width = (conv->int_encoding) ? 32 : sort->domain_width;
-      index = constant_int2tc(type2tc(new unsignedbv_type2t(dom_width)),
-            BigInt(idx));
-    } else {
-      index = idx_expr;
-    }
-
-    const smt_ast *args[3];
-    args[0] = this;
-    args[1] = conv->convert_ast(index);
-    args[2] = value;
-    return conv->mk_func_app(args[0]->sort, SMT_FUNC_STORE, args, 3);
-  } else {
+  if (sort->id == SMT_SORT_ARRAY)
+  {
+    return smt_ast::update(conv, value, idx, idx_expr);
+  }
+  else
+  {
     assert(sort->id == SMT_SORT_STRUCT || sort->id == SMT_SORT_UNION);
     assert(is_nil_expr(idx_expr) &&
            "Can only update constant index tuple elems");
@@ -1387,7 +1376,7 @@ void z3_smt_ast::dump() const
   std::cout << "sort is " << Z3_sort_to_string(e.ctx(), Z3_get_sort(e.ctx(), e)) << std::endl;
 }
 
-void z3_convt::dump_SMT()
+void z3_convt::dump_smt()
 {
   std::cout << solver << std::endl;
 }

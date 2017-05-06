@@ -1,13 +1,9 @@
-#include <string>
-#include <sstream>
-
-#include "mathsat_conv.h"
-
-// :|
 #include <gmp.h>
-
-#include <c_types.h>
-#include <expr_util.h>
+#include <mathsat_conv.h>
+#include <sstream>
+#include <string>
+#include <util/c_types.h>
+#include <util/expr_util.h>
 
 static const char* mathsat_config =
   "preprocessor.toplevel_propagation = true\n"
@@ -76,7 +72,6 @@ mathsat_convt::mathsat_convt(bool int_encoding,
 
 mathsat_convt::~mathsat_convt(void)
 {
-  delete_all_asts();
   msat_destroy_env(env);
   _env = nullptr;
 }
@@ -915,7 +910,7 @@ mathsat_smt_sort::~mathsat_smt_sort()
 {
 }
 
-void mathsat_convt::dump_SMT()
+void mathsat_convt::dump_smt()
 {
   print_mathsat_formula();
 }

@@ -1,6 +1,5 @@
-#include <string.h>
-
-#include "boolector_conv.h"
+#include <boolector_conv.h>
+#include <cstring>
 
 extern "C" {
 #include <btorcore.h>
@@ -214,7 +213,6 @@ boolector_convt::mk_sort(const smt_sort_kind k, ...)
   // Boolector doesn't have any special handling for sorts, they're all always
   // explicit arguments to functions. So, just use the base smt_sort class.
   va_list ap;
-  unsigned long uint;
 
   va_start(ap, k);
   switch (k) {
@@ -223,8 +221,10 @@ boolector_convt::mk_sort(const smt_sort_kind k, ...)
     std::cerr << "Boolector does not support integer encoding mode"<< std::endl;
     abort();
   case SMT_SORT_BV:
-    uint = va_arg(ap, unsigned long);
+  {
+    unsigned long uint = va_arg(ap, unsigned long);
     return new boolector_smt_sort(k, boolector_bitvec_sort(btor, uint), uint);
+  }
   case SMT_SORT_ARRAY:
   {
     const boolector_smt_sort* dom = va_arg(ap, boolector_smt_sort *); // Consider constness?
@@ -626,7 +626,7 @@ const smt_ast* btor_smt_ast::select(smt_convt* ctx, const expr2tc& idx) const
   return ctx->mk_func_app(rangesort, SMT_FUNC_SELECT, args, 2);
 }
 
-void boolector_convt::dump_SMT()
+void boolector_convt::dump_smt()
 {
   boolector_dump_smt2(btor, stdout);
 }

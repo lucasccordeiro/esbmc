@@ -1,12 +1,10 @@
 #ifndef _ESBMC_SOLVERS_MATHSAT_MATHSAT_CONV_H_
 #define _ESBMC_SOLVERS_MATHSAT_MATHSAT_CONV_H_
 
+#include <mathsat.h>
 #include <solvers/smt/smt_conv.h>
 #include <solvers/smt/smt_tuple_flat.h>
-
 #include <util/threeval.h>
-
-#include <mathsat.h>
 
 class mathsat_smt_sort : public smt_sort
 {
@@ -96,7 +94,7 @@ public:
   size_t get_exp_width(smt_sortt sort);
   size_t get_mant_width(smt_sortt sort);
 
-  virtual void dump_SMT();
+  virtual void dump_smt();
 
   // MathSAT data.
   msat_config cfg;

@@ -25,7 +25,7 @@ static const char* mathsat_config =
   "theory.arr.enable_witness = true";
 
 // Ahem
-msat_env* _env = NULL;
+msat_env* _env = nullptr;
 
 void print_mathsat_formula()
 {
@@ -70,7 +70,7 @@ mathsat_convt::mathsat_convt(bool int_encoding,
   _env = &env;
 }
 
-mathsat_convt::~mathsat_convt(void)
+mathsat_convt::~mathsat_convt()
 {
   msat_destroy_env(env);
   _env = nullptr;
@@ -652,7 +652,7 @@ smt_astt mathsat_convt::mk_smt_typecast_from_bvfloat(const typecast2t &cast)
   const mathsat_smt_ast *mfrom = mathsat_ast_downcast(from);
 
   msat_term t;
-  smt_sort *s = NULL;
+  smt_sort *s = nullptr;
   if(is_bv_type(cast.type)) {
     s = mk_sort(SMT_SORT_BV);
 
@@ -678,7 +678,7 @@ smt_astt mathsat_convt::mk_smt_typecast_from_bvfloat(const typecast2t &cast)
     abort();
 
   check_msat_error(t);
-  assert(s != NULL);
+  assert(s != nullptr);
 
   return new mathsat_smt_ast(this, s, t);
 }
@@ -857,19 +857,16 @@ mathsat_convt::convert_array_of(smt_astt init_val, unsigned long domain_width)
 void
 mathsat_convt::add_array_constraints_for_solving()
 {
-  return;
 }
 
 void
-mathsat_convt::push_array_ctx(void)
+mathsat_convt::push_array_ctx()
 {
-  return;
 }
 
 void
-mathsat_convt::pop_array_ctx(void)
+mathsat_convt::pop_array_ctx()
 {
-  return;
 }
 
 const smt_ast* mathsat_smt_ast::select(smt_convt* ctx, const expr2tc& idx) const
@@ -910,10 +907,6 @@ mathsat_smt_ast::~mathsat_smt_ast()
 {
   // We don't need to free the AST or the sort,
   // as freeing env does exactly the same
-}
-
-mathsat_smt_sort::~mathsat_smt_sort()
-{
 }
 
 void mathsat_convt::dump_smt()

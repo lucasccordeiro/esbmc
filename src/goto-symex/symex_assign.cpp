@@ -31,9 +31,9 @@ goto_symext::goto_symext(const namespacet &_ns, contextt &_new_context,
   options(opts),
   new_context(_new_context),
   goto_functions(_goto_functions),
-  target(_target),
-  cur_state(NULL),
-  last_throw(NULL),
+  target(std::move(_target)),
+  cur_state(nullptr),
+  last_throw(nullptr),
   inside_unexpected(false),
   unwinding_recursion_assumption(false),
   depth_limit(atol(options.get_option("depth").c_str())),
@@ -65,7 +65,7 @@ goto_symext::goto_symext(const namespacet &_ns, contextt &_new_context,
 
   max_unwind=atol(options.get_option("unwind").c_str());
 
-  art1 = NULL;
+  art1 = nullptr;
 
   valid_ptr_arr_name = "__ESBMC_alloc";
   alloc_size_arr_name = "__ESBMC_alloc_size";
@@ -84,7 +84,7 @@ goto_symext::goto_symext(const goto_symext &sym) :
   options(sym.options),
   new_context(sym.new_context),
   goto_functions(sym.goto_functions),
-  last_throw(NULL),
+  last_throw(nullptr),
   inside_unexpected(false),
   unwinding_recursion_assumption(false)
 {
@@ -125,7 +125,7 @@ goto_symext& goto_symext::operator=(const goto_symext &sym)
 
   // Symex target is another matter; a higher up class needs to decide
   // whether we're duplicating it or using the same one.
-  target = NULL;
+  target = nullptr;
 
   return *this;
 }
@@ -275,7 +275,8 @@ void goto_symext::symex_assign_symbol(
   // do the assignment
   target->assignment(
     tmp_guard.as_expr(),
-    renamed_lhs, orig_name_lhs,
+    renamed_lhs,
+    orig_name_lhs,
     rhs,
     cur_state->source,
     cur_state->gen_stack_trace(),
@@ -519,8 +520,6 @@ void goto_symext::symex_assign_concat(
     lhs_it++;
     rhs_it++;
   }
-
-  return;
 }
 
 void goto_symext::replace_nondet(expr2tc &expr)

@@ -228,18 +228,20 @@ languaget *new_ansi_c_language()
 bool ansi_c_languaget::from_expr(
   const exprt &expr,
   std::string &code,
-  const namespacet &ns)
+  const namespacet &ns,
+  bool fullname)
 {
-  code=expr2c(expr, ns);
+  code=expr2c(expr, ns, fullname);
   return false;
 }
 
 bool ansi_c_languaget::from_type(
   const typet &type,
   std::string &code,
-  const namespacet &ns)
+  const namespacet &ns,
+  bool fullname)
 {
-  code=type2c(type, ns);
+  code=type2c(type, ns, fullname);
   return false;
 }
 
@@ -285,10 +287,6 @@ bool ansi_c_languaget::to_expr(
   ansi_c_parser.clear();
 
   return result;
-}
-
-ansi_c_languaget::~ansi_c_languaget()
-{
 }
 
 bool ansi_c_languaget::merge_context(

@@ -24,8 +24,8 @@ class cbmc_parseoptionst:
   public language_uit
 {
 public:
-  virtual int doit();
-  virtual void help();
+  int doit() override ;
+  void help() override ;
 
   cbmc_parseoptionst(int argc, const char **argv):
     parseoptions_baset(esbmc_options, argc, argv),
@@ -67,7 +67,7 @@ protected:
   void preprocessing();
 
   void add_property_monitors(goto_functionst &goto_functions, namespacet &ns);
-  expr2tc calculate_a_property_monitor(std::string prefix, std::map<std::string, std::string> &strings, std::set<std::string> &used_syms);
+  expr2tc calculate_a_property_monitor(const std::string&& prefix, std::map<std::string, std::string> &strings, std::set<std::string> &used_syms);
   void add_monitor_exprs(goto_programt::targett insn, goto_programt::instructionst &insn_list, std::map<std::string, std::pair<std::set<std::string>, expr2tc> >monitors);
 
   void print_ileave_points(namespacet &ns, goto_functionst &goto_functions);

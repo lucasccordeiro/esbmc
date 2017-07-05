@@ -32,7 +32,7 @@ bool cpp_languaget::preprocess(
   // check extension
 
   const char *ext=strrchr(path.c_str(), '.');
-  if(ext!=NULL && std::string(ext)==".ipp")
+  if(ext!=nullptr && std::string(ext)==".ipp")
   {
     std::ifstream infile(path.c_str());
 
@@ -227,11 +227,8 @@ void cpp_languaget::show_parse(
     const cpp_linkage_spect &linkage_spec=
       item.get_linkage_spec();
 
-    for(cpp_linkage_spect::itemst::const_iterator
-        it=linkage_spec.items().begin();
-        it!=linkage_spec.items().end();
-        it++)
-      show_parse(out, *it);
+    for(const auto & it : linkage_spec.items())
+      show_parse(out, it);
 
     out << std::endl;
   }
@@ -243,11 +240,8 @@ void cpp_languaget::show_parse(
     out << "NAMESPACE " << namespace_spec.get_namespace()
         << ":" << std::endl;
 
-    for(cpp_namespace_spect::itemst::const_iterator
-        it=namespace_spec.items().begin();
-        it!=namespace_spec.items().end();
-        it++)
-      show_parse(out, *it);
+    for(const auto & it : namespace_spec.items())
+      show_parse(out, it);
 
     out << std::endl;
   }
@@ -277,18 +271,20 @@ languaget *new_cpp_language()
 bool cpp_languaget::from_expr(
   const exprt &expr,
   std::string &code,
-  const namespacet &ns)
+  const namespacet &ns,
+  bool fullname)
 {
-  code=expr2cpp(expr, ns);
+  code=expr2cpp(expr, ns, fullname);
   return false;
 }
 
 bool cpp_languaget::from_type(
   const typet &type,
   std::string &code,
-  const namespacet &ns)
+  const namespacet &ns,
+  bool fullname)
 {
-  code=type2cpp(type, ns);
+  code=type2cpp(type, ns, fullname);
   return false;
 }
 
@@ -331,8 +327,4 @@ bool cpp_languaget::to_expr(
   cpp_parser.clear();
 
   return result;
-}
-
-cpp_languaget::~cpp_languaget()
-{
 }

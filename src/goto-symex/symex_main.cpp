@@ -61,11 +61,10 @@ goto_symext::assume(const expr2tc &assumption)
   // Irritatingly, assumption destroys its expr argument
   expr2tc tmp_guard = cur_state->guard.as_expr();
   target->assumption(tmp_guard, assumption, cur_state->source);
-  return;
 }
 
 boost::shared_ptr<goto_symext::symex_resultt>
-goto_symext::get_symex_result(void)
+goto_symext::get_symex_result()
 {
 
   return boost::shared_ptr<goto_symext::symex_resultt>(
@@ -185,10 +184,9 @@ goto_symext::symex_step(reachability_treet & art)
 
     replace_dynamic_allocation(deref_code);
 
-    for (std::vector<expr2tc>::iterator it = call.operands.begin();
-         it != call.operands.end(); it++)
-      if (!is_nil_expr(*it))
-        dereference(*it, false);
+    for (auto & operand : call.operands)
+      if (!is_nil_expr(operand))
+        dereference(operand, false);
 
     // Always run intrinsics, whether guard is false or not. This is due to the
     // unfortunate circumstance where a thread starts with false guard due to
@@ -258,7 +256,7 @@ goto_symext::symex_step(reachability_treet & art)
   }
 }
 
-void goto_symext::symex_assume(void)
+void goto_symext::symex_assume()
 {
   if (cur_state->guard.is_false())
     return;
@@ -283,7 +281,7 @@ void goto_symext::symex_assume(void)
     cur_state->guard.make_false();
 }
 
-void goto_symext::symex_assert(void)
+void goto_symext::symex_assert()
 {
   if (cur_state->guard.is_false())
     return;
@@ -324,7 +322,7 @@ void goto_symext::symex_assert(void)
 
 void
 goto_symext::run_intrinsic(const code_function_call2t &func_call,
-                           reachability_treet &art, const std::string symname)
+                           reachability_treet &art, const std::string& symname)
 {
 
   if (symname == "__ESBMC_yield") {
@@ -365,31 +363,28 @@ goto_symext::run_intrinsic(const code_function_call2t &func_call,
               << std::endl;
     abort();
   }
-
-  return;
 }
 
 void
-goto_symext::finish_formula(void)
+goto_symext::finish_formula()
 {
 
   if (!memory_leak_check)
     return;
 
-  std::list<allocated_obj>::const_iterator it;
-  for (it = dynamic_memory.begin(); it != dynamic_memory.end(); it++) {
-
+  for (auto const &it : dynamic_memory)
+  {
     // Don't check memory leak if the object is automatically deallocated
-    if(it->auto_deallocd)
+    if(it.auto_deallocd)
       continue;
 
     // Assert that the allocated object was freed.
-    deallocated_obj2tc deallocd(it->obj);
+    deallocated_obj2tc deallocd(it.obj);
     equality2tc eq(deallocd, gen_true_expr());
     replace_dynamic_allocation(eq);
-    it->alloc_guard.guard_expr(eq);
+    it.alloc_guard.guard_expr(eq);
     cur_state->rename(eq);
-    target->assertion(it->alloc_guard.as_expr(), eq,
+    target->assertion(it.alloc_guard.as_expr(), eq,
                       "dereference failure: forgotten memory",
                       std::vector<stack_framet>(), cur_state->source);
     total_claims++;

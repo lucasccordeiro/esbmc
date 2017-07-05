@@ -371,16 +371,19 @@ bool clang_c_convertert::get_var(
     return true;
 
   // Check if we annotated it to be have an infinity size
-  for(auto const &attr : vd.getAttrs())
+  if(vd.hasAttrs())
   {
-    if (!llvm::isa<clang::AnnotateAttr>(attr))
-      continue;
-
-    const auto *a = llvm::cast<clang::AnnotateAttr>(attr);
-    if(a->getAnnotation().str() == "__ESBMC_inf_size")
+    for(auto const &attr : vd.getAttrs())
     {
-      assert(t.is_array());
-      t.size(exprt("infinity", uint_type()));
+      if (!llvm::isa<clang::AnnotateAttr>(attr))
+        continue;
+
+      const auto *a = llvm::cast<clang::AnnotateAttr>(attr);
+      if(a->getAnnotation().str() == "__ESBMC_inf_size")
+      {
+        assert(t.is_array());
+        t.size(exprt("infinity", uint_type()));
+      }
     }
   }
 
@@ -794,7 +797,7 @@ bool clang_c_convertert::get_type(
         if(get_type(ptype, param_type))
           return true;
 
-        type.arguments().push_back(param_type);
+        type.arguments().emplace_back(param_type);
       }
 
       // Apparently, if the type has no arguments, we assume ellipsis
@@ -1601,13 +1604,10 @@ bool clang_c_convertert::get_expr(
       const auto &declgroup = decl.getDeclGroup();
 
       codet decls("decl-block");
-      for (clang::DeclGroupRef::const_iterator
-        it = declgroup.begin();
-        it != declgroup.end();
-        ++it)
+      for (auto it : declgroup)
       {
         exprt single_decl;
-        if(get_decl(**it, single_decl))
+        if(get_decl(*it, single_decl))
           return true;
 
         decls.operands().push_back(single_decl);
@@ -2411,8 +2411,8 @@ void clang_c_convertert::get_default_symbol(
 {
   symbol.mode = "C";
   symbol.module = module_name;
-  symbol.location = location;
-  symbol.type = type;
+  symbol.location = std::move(location);
+  symbol.type = std::move(type);
   symbol.base_name = base_name;
   symbol.pretty_name = pretty_name;
   symbol.name = pretty_name;
@@ -2545,7 +2545,7 @@ void clang_c_convertert::get_start_location_from_stmt(
 {
   sm = &ASTContext->getSourceManager();
 
-  std::string function_name = "";
+  std::string function_name;
 
   if(current_functionDecl)
     function_name = current_functionDecl->getName().str();
@@ -2562,7 +2562,7 @@ void clang_c_convertert::get_final_location_from_stmt(
 {
   sm = &ASTContext->getSourceManager();
 
-  std::string function_name = "";
+  std::string function_name;
 
   if(current_functionDecl)
     function_name = current_functionDecl->getName().str();
@@ -2579,7 +2579,7 @@ void clang_c_convertert::get_location_from_decl(
 {
   sm = &ASTContext->getSourceManager();
 
-  std::string function_name = "";
+  std::string function_name;
 
   if(decl.getDeclContext()->isFunctionOrMethod())
   {

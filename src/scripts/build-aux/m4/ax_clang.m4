@@ -27,10 +27,9 @@ AC_DEFUN([AX_CLANG],
                     AC_MSG_ERROR(--with-clang expected directory name)
                 fi
             ],
-            dnl defaults to /usr/
+            dnl defaults to $PATH
             [
-                ac_clang_path=$PATH
-                AC_PATH_PROGS([CLANG],[clang],[],[$ac_clang_path])
+                AC_PATH_PROGS([CLANG],[clang],[],[$PATH])
             ]
     )
 
@@ -39,7 +38,7 @@ AC_DEFUN([AX_CLANG],
     fi
 
     dnl check clang version
-    AC_MSG_CHECKING(if clang >= $1)
+    AC_MSG_CHECKING(if clang > $1)
 
     clangversion=0
     _version=$1
@@ -65,8 +64,33 @@ AC_DEFUN([AX_CLANG],
         ifelse([$3], , :, [$3])
     fi
 
+    clang_base=/usr
+    if test "$ac_clang_path" != ""; then
+        clang_base=$ac_clang_path
+    fi
+
+    dnl Search for the includes
+    AC_MSG_CHECKING(clang include directory)
+    succeeded=no
+
+    includesubdirs="$clang_base $clang_base/lib64/llvm-$clangversion $clang_base/lib/llvm-$clangversion"
+    for includesubdir in $includesubdirs ; do
+        if ls "$includesubdir/include/clang/Tooling/Tooling.h" >/dev/null 2>&1 ; then
+            succeeded=yes
+            clang_includes_path=$includesubdir/include
+            break;
+        fi
+    done
+
+    if test "$succeeded" != "yes" ; then
+        AC_MSG_RESULT(no)
+        ifelse([$3], , :, [$3])
+    else
+        AC_MSG_RESULT($clang_includes_path)
+    fi
+
     dnl Now search for the libraries
-    AC_MSG_CHECKING(clang lib directory)
+    AC_MSG_CHECKING(clang library directory)
     succeeded=no
 
     dnl On 64-bit systems check for system libraries in both lib64 and lib.
@@ -78,22 +102,10 @@ AC_DEFUN([AX_CLANG],
     ax_arch=`uname -m`
     case $ax_arch in
       x86_64)
-        libsubdirs="lib64 libx32 lib lib64"
+        libsubdirs="lib64 libx32 lib lib64 lib64/llvm-$clangversion/lib libx32/llvm-$clangversion/lib lib/llvm-$clangversion/lib lib64/llvm-$clangversion/lib"
         ;;
       ppc64|s390x|sparc64|aarch64|ppc64le)
-        libsubdirs="lib64 lib lib64 ppc64le"
-        ;;
-    esac
-
-    dnl allow for real multi-arch paths e.g. /usr/lib/x86_64-linux-gnu. Give
-    dnl them priority over the other paths since, if libs are found there, they
-    dnl are almost assuredly the ones desired.
-    AC_REQUIRE([AC_CANONICAL_HOST])
-    libsubdirs="lib/${host_cpu}-${host_os} $libsubdirs"
-
-    case ${host_cpu} in
-      i?86)
-        libsubdirs="lib/i386-${host_os} $libsubdirs"
+        libsubdirs="lib64 lib lib64 ppc64le lib64/llvm-$clangversion/lib lib/llvm-$clangversion/lib lib64/llvm-$clangversion/lib ppc64le/llvm-$clangversion/lib"
         ;;
     esac
 
@@ -103,21 +115,12 @@ AC_DEFUN([AX_CLANG],
     fi
 
     dnl Check the system location for clang libraries
-    clang_includes_path=$ac_clang_path/include/clang
     for libsubdir in $libsubdirs ; do
-        if ls "$ac_clang_path/$libsubdir/libclang"* >/dev/null 2>&1 ; then break; fi
-    done
-
-    for i in `ls -d $ac_clang_path/$libsubdir/libclang.$lib_ext.* 2>/dev/null`; do
-        _version_tmp=`echo $i | sed "s#$ac_clang_path/$libsubdir/##" | sed "s/libclang.$lib_ext.//"`
-        V_CHECK=`expr $_version_tmp \> $_version`
-        if test "$V_CHECK" != "1" ; then
-                continue
+        if ls "$clang_base/$libsubdir/libclang"* >/dev/null 2>&1 ; then
+            succeeded=yes
+            clang_libs_path=$clang_base/$libsubdir
+            break;
         fi
-
-        succeeded=yes
-        clang_libs_path=$ac_clang_path/$libsubdir
-        break;
     done
 
     if test "$succeeded" != "yes" ; then
@@ -142,11 +145,13 @@ AC_DEFUN([AX_CLANG],
 
     dnl Search if clang was shipped with a symbolic link call libgomp.so
     dnl We actually link with libgomp.so and this link breaks the old frontend
-    AC_MSG_CHECKING(if $clang_libs_path/libgomp.so is present)
-    if ls -L "$clang_libs_path/libgomp.so" >/dev/null 2>&1 ; then
-        AC_MSG_ERROR([Found libgomp.so on $clang_libs_path. ESBMC is linked against the GNU libgomp and the one shipped with clang is known to cause issues on our tool. Please, remove it before continuing.])
+    if test -d "$withval" ; then
+        AC_MSG_CHECKING(if $clang_libs_path/libgomp.so is present)
+        if ls -L "$clang_libs_path/libgomp.so" >/dev/null 2>&1 ; then
+            AC_MSG_ERROR([Found libgomp.so on $clang_libs_path. ESBMC is linked against the GNU libgomp and the one shipped with clang is known to cause issues on our tool. Please, remove it before continuing.])
+        fi
+        AC_MSG_RESULT(no)
     fi
-    AC_MSG_RESULT(no)
 
     clang_CPPFLAGS="-I$clang_includes_path"
     clang_LDFLAGS="-L$clang_libs_path"

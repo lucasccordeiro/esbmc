@@ -21,10 +21,9 @@
 #include <util/std_expr.h>
 
 bool
-goto_symext::get_unwind_recursion(
-  const irep_idt &identifier, unsigned unwind)
+goto_symext::get_unwind_recursion(const irep_idt &identifier, BigInt unwind)
 {
-  unsigned long this_loop_max_unwind = max_unwind;
+  BigInt this_loop_max_unwind = max_unwind;
 
   if (unwind != 0)
   {
@@ -34,10 +33,10 @@ goto_symext::get_unwind_recursion(
     const symbolt &symbol = ns.lookup(identifier);
 
     std::string msg = "Unwinding recursion " + id2string(symbol.display_name())
-      + " iteration " + i2string(unwind);
+      + " iteration " + integer2string(unwind);
 
     if (this_loop_max_unwind != 0)
-      msg += " (" + i2string(this_loop_max_unwind) + " max)";
+      msg += " (" + integer2string(this_loop_max_unwind) + " max)";
 
     std::cout << msg << std::endl;
   }
@@ -78,13 +77,7 @@ goto_symext::argument_assignments(
       abort();
     }
 
-    const symbolt *symbol = ns.get_context().find_symbol(identifier);
-    assert(symbol != nullptr);
-
-    exprt tmp_lhs = symbol_expr(*symbol);
-    expr2tc lhs;
-    migrate_expr(tmp_lhs, lhs);
-
+    symbol2tc lhs(function_type.arguments[name_idx], identifier);
     if(is_nil_expr(*it1))
     {
       ; // XXX jmorse, is this valid?
@@ -206,7 +199,7 @@ goto_symext::symex_function_call_code(const expr2tc &expr)
 
   const goto_functiont &goto_function = it->second;
 
-  unsigned &unwinding_counter = cur_state->function_unwind[identifier];
+  BigInt &unwinding_counter = cur_state->function_unwind[identifier];
 
   // see if it's too much
   if (get_unwind_recursion(identifier, unwinding_counter)) {
@@ -246,9 +239,7 @@ goto_symext::symex_function_call_code(const expr2tc &expr)
   // read the arguments -- before the locality renaming
   std::vector<expr2tc> arguments = call.operands;
   for (auto & argument : arguments)
-  {
     cur_state->rename(argument);
-  }
 
   // Rename the return value to level1, identifying the data object / storage
   // to which the return value should be written. This is important in the case
@@ -259,7 +250,7 @@ goto_symext::symex_function_call_code(const expr2tc &expr)
     cur_state->rename_address(ret_value);
 
   // increase unwinding counter
-  unwinding_counter++;
+  ++unwinding_counter;
 
   // produce a new frame
   assert(!cur_state->call_stack.empty());
@@ -359,7 +350,7 @@ goto_symext::symex_function_call_deref(const expr2tc &expr)
   // Generate a list of functions to call. We'll then proceed to call them,
   // and will later on merge them.
   expr2tc func_ptr = call.function;
-  dereference(func_ptr, false);
+  dereference(func_ptr, dereferencet::READ);
 
   // Match the two varieties of failed symbol we can encounter,
   if (is_symbol2t(func_ptr) && (
@@ -509,8 +500,8 @@ goto_symext::pop_frame()
   }
 
   // decrease recursion unwinding counter
-  if (frame.function_identifier != "")
-    cur_state->function_unwind[frame.function_identifier]--;
+  if (!frame.function_identifier.empty())
+    --cur_state->function_unwind[frame.function_identifier];
 
   cur_state->pop_frame();
 }
@@ -557,7 +548,7 @@ goto_symext::make_return_assignment(expr2tc &assign, const expr2tc &code)
   if (!is_nil_expr(ret.operand)) {
     expr2tc value = ret.operand;
 
-    dereference(value, false);
+    dereference(value, dereferencet::READ);
 
     if (!is_nil_expr(frame.return_value)) {
       assign = code_assign2tc(frame.return_value, value);

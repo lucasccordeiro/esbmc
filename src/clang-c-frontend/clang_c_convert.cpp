@@ -92,10 +92,6 @@ bool clang_c_convertert::get_decl(
     // Label declaration
     case clang::Decl::Label:
     {
-      std::cerr << "ESBMC does not support label declaration"
-                << std::endl;
-      return true;
-
       const clang::LabelDecl &ld =
         static_cast<const clang::LabelDecl&>(decl);
 
@@ -433,7 +429,7 @@ bool clang_c_convertert::get_var(
   symbolt &added_symbol = *context.find_symbol(symbol_name);
 
   code_declt decl;
-  decl.operands().push_back(symbol_expr(added_symbol));
+  decl.operands().push_back(symbol_exprt(identifier, t));
 
   if(vd.hasInit())
   {
@@ -588,6 +584,14 @@ bool clang_c_convertert::get_function_params(
   std::string pretty_name;
   get_function_param_name(pdecl, pretty_name);
 
+  param.cmt_identifier(pretty_name);
+  param.location() = location_begin;
+
+  // TODO: we can remove the following code once irep1 is dead, there
+  // is no need to add the function argument to the symbol table,
+  // as nothing relies on it. However, if we remove this now, the migrate
+  // code will wrongly assume the symbol to be level1, as it generates
+  // level0 symbol only if they are already on the context
   symbolt param_symbol;
   get_default_symbol(
     param_symbol,
@@ -601,9 +605,6 @@ bool clang_c_convertert::get_function_params(
   param_symbol.lvalue = true;
   param_symbol.is_parameter = true;
   param_symbol.file_local = true;
-
-  param.cmt_identifier(param_symbol.name.as_string());
-  param.location() = param_symbol.location;
 
   // Save the function's param address and name to the object map
   std::size_t address = reinterpret_cast<std::size_t>(pdecl.getFirstDecl());
@@ -1360,11 +1361,6 @@ bool clang_c_convertert::get_expr(
 
     case clang::Stmt::AddrLabelExprClass:
     {
-      std::cerr << "ESBMC currently does not support label as values"
-                << std::endl;
-      stmt.dumpColor();
-      return true;
-
       const clang::AddrLabelExpr &addrlabelExpr =
         static_cast<const clang::AddrLabelExpr &>(stmt);
 
@@ -1895,11 +1891,6 @@ bool clang_c_convertert::get_expr(
 
     case clang::Stmt::IndirectGotoStmtClass:
     {
-      std::cerr << "ESBMC currently does not support indirect gotos"
-                << std::endl;
-      stmt.dumpColor();
-      return true;
-
       const clang::IndirectGotoStmt &goto_stmt =
         static_cast<const clang::IndirectGotoStmt &>(stmt);
 
@@ -1914,6 +1905,11 @@ bool clang_c_convertert::get_expr(
       }
       else
       {
+        std::cerr << "ESBMC currently does not support indirect gotos"
+                  << std::endl;
+        stmt.dumpColor();
+        return true;
+
         exprt target;
         if(get_expr(*goto_stmt.getTarget(), target))
           return true;

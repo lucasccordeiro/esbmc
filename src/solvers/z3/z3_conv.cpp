@@ -62,6 +62,8 @@ z3_convt::z3_convt(bool int_encoding, const namespacet &_ns)
 
   z3::params p(ctx);
   p.set("relevancy", (unsigned int) 0);
+  p.set("model", true);
+  p.set("proof", false);
   solver.set(p);
 
   Z3_set_ast_print_mode(ctx, Z3_PRINT_SMTLIB_COMPLIANT);
@@ -801,8 +803,8 @@ smt_astt z3_convt::mk_smt_typecast_to_bvfloat(const typecast2t &cast)
     // transformed into fpa = b ? 1 : 0;
     const smt_ast *args[3];
     args[0] = from;
-    args[1] = convert_ast(gen_true_expr());
-    args[2] = convert_ast(gen_false_expr());
+    args[1] = convert_ast(gen_one(cast.type));
+    args[2] = convert_ast(gen_zero(cast.type));
 
     return mk_func_app(s, SMT_FUNC_ITE, args, 3);
   }
@@ -847,9 +849,7 @@ smt_astt z3_convt::mk_smt_bvfloat_arith_ops(const expr2tc& expr)
   const z3_smt_ast *ms1 = z3_smt_downcast(s1);
 
   if(is_ieee_sqrt2t(expr))
-  {
     return new_ast(ctx.fpa_sqrt(mrm->e, ms1->e), s);
-  }
 
   smt_astt s2 = convert_ast(*expr->get_sub_expr(2));
   const z3_smt_ast *ms2 = z3_smt_downcast(s2);
@@ -1237,14 +1237,37 @@ z3_convt::get_bv(const type2tc &t, const smt_ast *a)
     unsigned sw = Z3_fpa_get_sbits(ctx, e.get_sort()) - 1;
 
     ieee_float_spect spec(sw, ew);
-    ieee_floatt value(spec);
+    ieee_floatt number(spec);
+
+    // TODO: The next version of Z3 provides new functions:
+    // Z3_fpa_is_numeral_nan, Z3_fpa_is_numeral_inf and
+    // Z3_fpa_is_numeral_positive. We can replace the following
+    // code when the new version is released
+
+    z3::expr v1;
+    v1 = model.eval(z3::to_expr(ctx, Z3_mk_fpa_is_nan(ctx, e)));
+    if(v1.is_bool() && Z3_get_bool_value(ctx, v1) == Z3_L_TRUE)
+    {
+      number.make_NaN();
+      return constant_floatbv2tc(number);
+    }
+
+    v1 = model.eval(z3::to_expr(ctx, Z3_mk_fpa_is_infinite(ctx, e)));
+    if(v1.is_bool() && Z3_get_bool_value(ctx, v1) == Z3_L_TRUE)
+    {
+      v1 = model.eval(z3::to_expr(ctx, Z3_mk_fpa_is_positive(ctx, e)));
+      if(v1.is_bool() && Z3_get_bool_value(ctx, v1) == Z3_L_TRUE)
+        number.make_plus_infinity();
+      else
+        number.make_minus_infinity();
+
+      return constant_floatbv2tc(number);
+    }
 
     Z3_ast v;
     if(Z3_model_eval(ctx, model, Z3_mk_fpa_to_ieee_bv(ctx, e), 1, &v))
     {
-      ieee_floatt number(spec);
       number.unpack(BigInt(Z3_get_numeral_string(ctx, v)));
-
       return constant_floatbv2tc(number);
     }
   }

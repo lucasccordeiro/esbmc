@@ -183,7 +183,7 @@ void bmct::error_trace(
         ns,
         goto_trace
       );
-
+      /* fallthrough */
     case ui_message_handlert::PLAIN:
       std::cout << std::endl << "Counterexample:" << std::endl;
       show_goto_trace(std::cout, ns, goto_trace);
@@ -352,17 +352,15 @@ void bmct::show_program(boost::shared_ptr<symex_target_equationt> &eq)
 
     if(!sparse) {
       std::cout << "// " << it.source.pc->location_number << " ";
-      std::cout << it.source.pc->location.as_string() << " ";
-      if(!it.comment.empty()) std::cout << "(" << it.comment << ")";
+      std::cout << it.source.pc->location.as_string();
+      if(!it.comment.empty()) std::cout << " (" << it.comment << ")";
       std::cout << '\n';
     }
 
     std::cout <<   "(" << count << ") ";
 
     std::string string_value;
-
-    exprt cond = migrate_expr_back(it.cond);
-    languages.from_expr(cond, string_value, fullname);
+    languages.from_expr(migrate_expr_back(it.cond), string_value, fullname);
 
     if(it.is_assignment())
     {
@@ -383,7 +381,7 @@ void bmct::show_program(boost::shared_ptr<symex_target_equationt> &eq)
 
     if(!migrate_expr_back(it.guard).is_true() && print_guard)
     {
-      languages.from_expr(migrate_expr_back(it.guard), string_value);
+      languages.from_expr(migrate_expr_back(it.guard), string_value, fullname);
       std::cout << std::string(i2string(count).size()+3, ' ');
       std::cout << "guard: " << string_value << "\n";
     }

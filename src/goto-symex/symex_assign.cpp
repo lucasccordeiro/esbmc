@@ -129,12 +129,6 @@ goto_symext& goto_symext::operator=(const goto_symext &sym)
   return *this;
 }
 
-void goto_symext::do_simplify(exprt &expr)
-{
-  if(!no_simplify)
-    simplify(expr);
-}
-
 void goto_symext::do_simplify(expr2tc &expr)
 {
   if(!no_simplify)
@@ -207,7 +201,7 @@ void goto_symext::symex_assign(const expr2tc &code_assign)
     else if(is_symbol2t(lhs))
     {
       symbol2t s = to_symbol2t(lhs);
-      if(s.thename.as_string().find("return_value!") != std::string::npos)
+      if(s.thename.as_string().find("return_value$") != std::string::npos)
         t = symex_targett::HIDDEN;
     }
 
@@ -532,7 +526,7 @@ void goto_symext::replace_nondet(expr2tc &expr)
   }
   else
   {
-    expr.get()->Foreach_operand([this] (expr2tc &e) {
+    expr->Foreach_operand([this] (expr2tc &e) {
         if (!is_nil_expr(e))
           replace_nondet(e);
       }

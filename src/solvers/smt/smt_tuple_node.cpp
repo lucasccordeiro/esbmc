@@ -312,7 +312,7 @@ smt_tuple_node_flattener::tuple_get_rec(tuple_node_smt_astt tuple)
   if (tuple->elements.size() == 0)
   {
     for(unsigned int i = 0; i < strct.members.size(); i++)
-      outstruct.get()->datatype_members.emplace_back();
+      outstruct->datatype_members.emplace_back();
     return outstruct;
   }
 
@@ -326,10 +326,10 @@ smt_tuple_node_flattener::tuple_get_rec(tuple_node_smt_astt tuple)
       res = tuple_get_rec(to_tuple_node_ast(tuple->elements[i]));
     } else if (is_tuple_array_ast_type(it)) {
       res = expr2tc(); // XXX currently unimplemented
-    } else if (is_number_type(it)) {
-      res = ctx->get_bv(it, tuple->elements[i]);
     } else if (is_bool_type(it)) {
       res = ctx->get_bool(tuple->elements[i]);
+    } else if (is_number_type(it)) {
+      res = ctx->get_bv(it, tuple->elements[i]);
     } else if (is_array_type(it)) {
       std::cerr << "Fetching array elements inside tuples currently unimplemented, sorry" << std::endl;
       res = expr2tc();
@@ -338,7 +338,7 @@ smt_tuple_node_flattener::tuple_get_rec(tuple_node_smt_astt tuple)
       abort();
     }
 
-    outstruct.get()->datatype_members.push_back(res);
+    outstruct->datatype_members.push_back(res);
     i++;
   }
 

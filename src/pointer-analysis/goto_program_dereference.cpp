@@ -28,8 +28,7 @@ bool goto_program_dereferencet::has_failed_symbol(
         to_symbol2t(expr).thename == "INVALID")
       return false;
 
-    exprt tmp_sym = migrate_expr_back(expr);
-    const symbolt &ptr_symbol = ns.lookup(tmp_sym);
+    const symbolt &ptr_symbol = ns.lookup(migrate_expr_back(expr));
 
     const irep_idt &failed_symbol = ptr_symbol.type.failed_symbol();
 
@@ -210,7 +209,7 @@ void goto_program_dereferencet::dereference_instruction(
       code_expression2t &theexp = to_code_expression2t(i.code);
       dereference_expr(theexp.operand, checks_only, dereferencet::READ);
     } else if (is_code_printf2t(i.code)) {
-      i.code.get()->Foreach_operand([this, &checks_only] (expr2tc &e) {
+      i.code->Foreach_operand([this, &checks_only] (expr2tc &e) {
           dereference_expr(e, checks_only, dereferencet::READ);
         }
       );

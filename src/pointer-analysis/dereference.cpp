@@ -6,7 +6,6 @@ Author: Daniel Kroening, kroening@kroening.com
 
 \*******************************************************************/
 
-#include <ansi-c/c_typecast.h>
 #include <cassert>
 #include <langapi/language_util.h>
 #include <pointer-analysis/dereference.h>
@@ -16,6 +15,7 @@ Author: Daniel Kroening, kroening@kroening.com
 #include <util/array_name.h>
 #include <util/base_type.h>
 #include <util/c_misc.h>
+#include <util/c_typecast.h>
 #include <util/c_types.h>
 #include <util/config.h>
 #include <util/cprover_prefix.h>
@@ -146,7 +146,7 @@ dereferencet::dereference_expr(
     default:
     {
       // Recurse over the operands
-      expr.get()->Foreach_operand([this, &guard, &mode] (expr2tc &e)
+      expr->Foreach_operand([this, &guard, &mode] (expr2tc &e)
         {
           if (is_nil_expr(e)) return;
           dereference_expr(e, guard, mode);
@@ -171,7 +171,7 @@ dereferencet::dereference_guard_expr(expr2tc &expr, guardt &guard, modet mode)
     // Take the current size of the guard, so that we can reset it later.
     guardt old_guards(guard);
 
-    expr.get()->Foreach_operand([this, &guard, &expr] (expr2tc &op) {
+    expr->Foreach_operand([this, &guard, &expr] (expr2tc &op) {
       assert(is_bool_type(op));
 
       // Handle any derererences in this operand
@@ -512,14 +512,14 @@ dereferencet::make_failed_symbol(const type2tc &out_type)
 
   get_new_name(symbol, ns);
 
-  exprt tmp_sym_expr = symbol_expr(symbol);
-
-  new_context.move(symbol);
+  symbolt *s = nullptr;
+  new_context.move(symbol, s);
+  assert(s != nullptr);
 
   // Due to migration hiccups, migration must occur after the symbol
   // appears in the symbol table.
   expr2tc value;
-  migrate_expr(tmp_sym_expr, value);
+  migrate_expr(symbol_expr(*s), value);
   return value;
 }
 
@@ -1726,7 +1726,7 @@ dereferencet::wrap_in_scalar_step_list(expr2tc &value,
     for (std::list<expr2tc>::const_iterator it = scalar_step_list->begin();
          it != scalar_step_list->end(); it++) {
       expr2tc tmp = *it;
-      *tmp.get()->get_sub_expr_nc(0) = accuml;
+      *tmp->get_sub_expr_nc(0) = accuml;
       accuml = tmp;
     }
     value = accuml;

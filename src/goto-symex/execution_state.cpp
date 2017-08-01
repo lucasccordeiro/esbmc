@@ -155,7 +155,6 @@ execution_statet::operator=(const execution_statet &ex)
   pre_goto_guard = ex.pre_goto_guard;
   mon_thread_warning = ex.mon_thread_warning;
   check_ltl = ex.check_ltl;
-  property_monitor_strings = ex.property_monitor_strings;
 
   monitor_tid = ex.monitor_tid;
   tid_is_set = ex.tid_is_set;
@@ -653,7 +652,6 @@ execution_statet::execute_guard()
 
   node_id = node_count++;
   expr2tc guard_expr = get_guard_identifier();
-  exprt new_rhs, const_prop_val;
   expr2tc parent_guard;
 
   // Parent guard of this context switch - if a assign/claim/assume, just use
@@ -1258,10 +1256,10 @@ boost::shared_ptr<execution_statet> dfs_execution_statet::clone() const
 
   // Duplicate target equation; or if we're encoding at runtime, push a context.
   if (smt_during_symex) {
-    d.get()->target = target;
-    d.get()->target->push_ctx();
+    d->target = target;
+    d->target->push_ctx();
   } else {
-    d.get()->target = target.get()->clone();
+    d->target = target->clone();
   }
 
   return d;
@@ -1278,7 +1276,7 @@ boost::shared_ptr<execution_statet> schedule_execution_statet::clone() const
     boost::shared_ptr<schedule_execution_statet>(new schedule_execution_statet(*this));
 
   // Don't duplicate target equation.
-  s.get()->target = target;
+  s->target = target;
   return s;
 }
 

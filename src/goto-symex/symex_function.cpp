@@ -7,6 +7,7 @@
 
 \*******************************************************************/
 
+#include <algorithm>
 #include <cassert>
 #include <goto-symex/execution_state.h>
 #include <goto-symex/goto_symex.h>
@@ -29,6 +30,15 @@ goto_symext::get_unwind_recursion(const irep_idt &identifier, BigInt unwind)
   {
     if(options.get_bool_option("abort-on-recursion"))
       abort();
+
+    if(k_induction && !options.get_bool_option("disable-inductive-step"))
+    {
+      std::cout << "**** WARNING: k-induction does not support recursion yet. "
+          << "Disabling inductive step\n";
+
+      // Disable inductive step on recursion
+      options.set_option("disable-inductive-step", true);
+    }
 
     const symbolt &symbol = ns.lookup(identifier);
 
@@ -109,8 +119,7 @@ goto_symext::argument_assignments(
         }
       }
 
-      guardt guard;
-      symex_assign_symbol(lhs, rhs, guard, symex_targett::STATE);
+      symex_assign(code_assign2tc(lhs, rhs), symex_targett::HIDDEN);
     }
 
     it1++;
@@ -148,7 +157,7 @@ goto_symext::argument_assignments(
         (*it1)->type, id, symbol2t::level1, 0, 0,
         cur_state->top().level1.thread_id, 0);
 
-      symex_assign(code_assign2tc(va_lhs, *it1));
+      symex_assign(code_assign2tc(va_lhs, *it1), symex_targett::HIDDEN);
     }
   }
   else if(it1 != arguments.end())
@@ -199,9 +208,8 @@ goto_symext::symex_function_call_code(const expr2tc &expr)
 
   // see if it's too much
   if (get_unwind_recursion(identifier, unwinding_counter)) {
-    if (!no_unwinding_assertions && !base_case) {
-      claim(gen_false_expr(),
-            "recursion unwinding assertion");
+    if (!no_unwinding_assertions) {
+      claim(gen_false_expr(), "recursion unwinding assertion");
     } else {
       // Add an unwinding assumption.
       expr2tc now_guard = cur_state->guard.as_expr();
@@ -224,8 +232,7 @@ goto_symext::symex_function_call_code(const expr2tc &expr)
       unsigned int &nondet_count = get_nondet_counter();
       symbol2tc rhs(call.ret->type, "nondet$symex::"+i2string(nondet_count++));
 
-      guardt guard;
-      symex_assign_rec(call.ret, rhs, guard, symex_targett::STATE);
+      symex_assign(code_assign2tc(call.ret, rhs));
     }
 
     cur_state->source.pc++;
@@ -363,6 +370,24 @@ goto_symext::symex_function_call_deref(const expr2tc &expr)
   }
 
   std::list<std::pair<guardt, symbol2tc> > l = get_function_list(func_ptr);
+
+  // Filter out illegal calls
+  auto illegal_filter = [&call](const decltype(l)::value_type &it) -> bool {
+    expr2tc sym = it.second;
+    assert(is_symbol2t(sym));
+    if (!is_code_type(sym))
+      return true;
+
+    const code_type2t &ct = to_code_type(sym->type);
+    if (ct.arguments.size() != call.operands.size())
+      return true;
+
+    // At this point we could (should) do more: for example ensuring that the
+    // arguments and return values are compatible. Skip for now.
+    return false;
+  };
+  // Remove if returns an iterator for the new end of list.
+  l.erase(std::remove_if(l.begin(), l.end(), illegal_filter), l.end());
 
   // Store.
   for (auto & it : l) {

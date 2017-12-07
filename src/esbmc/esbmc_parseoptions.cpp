@@ -78,7 +78,7 @@ timeout_handler(int dummy __attribute__((unused)))
 }
 #endif
 
-void cbmc_parseoptionst::set_verbosity_msg(messaget &message)
+void esbmc_parseoptionst::set_verbosity_msg(messaget &message)
 {
   int v=8;
 
@@ -96,7 +96,7 @@ void cbmc_parseoptionst::set_verbosity_msg(messaget &message)
 
 extern "C" uint8_t *esbmc_version_string;
 
-uint64_t cbmc_parseoptionst::read_time_spec(const char *str)
+uint64_t esbmc_parseoptionst::read_time_spec(const char *str)
 {
   uint64_t mult;
   int len = strlen(str);
@@ -127,7 +127,7 @@ uint64_t cbmc_parseoptionst::read_time_spec(const char *str)
   return timeout;
 }
 
-uint64_t cbmc_parseoptionst::read_mem_spec(const char *str)
+uint64_t esbmc_parseoptionst::read_mem_spec(const char *str)
 {
 
   uint64_t mult;
@@ -159,7 +159,7 @@ uint64_t cbmc_parseoptionst::read_mem_spec(const char *str)
   return size;
 }
 
-void cbmc_parseoptionst::get_command_line_options(optionst &options)
+void esbmc_parseoptionst::get_command_line_options(optionst &options)
 {
   if(config.set(cmdline))
   {
@@ -172,8 +172,11 @@ void cbmc_parseoptionst::get_command_line_options(optionst &options)
   if(cmdline.isset("witness-output"))
     options.set_option("witness-output", cmdline.getval("witness-output"));
 
-  if(cmdline.isset("witness-detailed"))
-    options.set_option("witness-detailed", true);
+  if(cmdline.isset("witness-producer"))
+    options.set_option("witness-producer", cmdline.getval("witness-producer"));
+
+  if(cmdline.isset("witness-programfile"))
+    options.set_option("witness-programfile", cmdline.getval("witness-programfile"));
 
   if(cmdline.isset("git-hash"))
   {
@@ -317,7 +320,7 @@ void cbmc_parseoptionst::get_command_line_options(optionst &options)
   config.options = options;
 }
 
-int cbmc_parseoptionst::doit()
+int esbmc_parseoptionst::doit()
 {
   //
   // Print a banner
@@ -367,6 +370,9 @@ int cbmc_parseoptionst::doit()
   if(cmdline.isset("incremental-bmc"))
     return doit_incremental();
 
+  if(cmdline.isset("termination"))
+    return doit_termination();
+
   optionst opts;
   get_command_line_options(opts);
 
@@ -392,7 +398,7 @@ int cbmc_parseoptionst::doit()
   return do_bmc(bmc);
 }
 
-int cbmc_parseoptionst::doit_k_induction_parallel()
+int esbmc_parseoptionst::doit_k_induction_parallel()
 {
   // Pipes for communication between processes
   int forward_pipe[2], backward_pipe[2];
@@ -890,12 +896,6 @@ int cbmc_parseoptionst::doit_k_induction_parallel()
       opts.set_option("forward-condition", false);
       opts.set_option("inductive-step", true);
 
-      // This will be changed to true if the code contains:
-      // 1. Dynamic allocated memory
-      // 2. Multithreaded code (during symbolic execution)
-      // 3. Recursion (during inlining)
-      opts.set_option("disable-inductive-step", false);
-
       // Start communication to the parent process
       close(forward_pipe[0]);
       close(backward_pipe[1]);
@@ -962,11 +962,8 @@ int cbmc_parseoptionst::doit_k_induction_parallel()
   return 0;
 }
 
-int cbmc_parseoptionst::doit_k_induction()
+int esbmc_parseoptionst::doit_k_induction()
 {
-  // Generate goto functions for base case and forward condition
-  status("\n*** Generating Base Case and Forward Condition ***");
-
   optionst opts;
   get_command_line_options(opts);
 
@@ -995,29 +992,15 @@ int cbmc_parseoptionst::doit_k_induction()
 
   for(BigInt k_step = 1; k_step <= max_k_step; k_step += k_step_inc)
   {
-    std::cout << "\n*** K-Induction Loop Iteration ";
-    std::cout << integer2string(k_step);
+    std::cout << "\n*** Iteration number ";
+    std::cout << k_step;
     std::cout << " ***\n";
-    std::cout << "*** Checking base case\n";
 
     if(do_base_case(opts, goto_functions, k_step))
       return true;
 
-    std::cout << "\n*** K-Induction Loop Iteration ";
-    std::cout << integer2string(k_step);
-    std::cout << " ***\n";
-    std::cout << "*** Checking forward condition\n";
-
     if(!do_forward_condition(opts, goto_functions, k_step))
       return false;
-
-    if(k_step > 1)
-    {
-      std::cout << "\n*** K-Induction Loop Iteration ";
-      std::cout << integer2string( k_step);
-      std::cout << " ***\n";
-      std::cout << "*** Checking inductive step\n";
-    }
 
     if(!do_inductive_step(opts, goto_functions, k_step))
       return false;
@@ -1029,11 +1012,8 @@ int cbmc_parseoptionst::doit_k_induction()
   return 0;
 }
 
-int cbmc_parseoptionst::doit_falsification()
+int esbmc_parseoptionst::doit_falsification()
 {
-  // Generate goto functions for base case and forward condition
-  goto_functionst goto_functions;
-
   optionst opts;
   get_command_line_options(opts);
 
@@ -1076,10 +1056,8 @@ int cbmc_parseoptionst::doit_falsification()
   return 0;
 }
 
-int cbmc_parseoptionst::doit_incremental()
+int esbmc_parseoptionst::doit_incremental()
 {
-  // Generate goto functions for base case and forward condition
-
   optionst opts;
   get_command_line_options(opts);
 
@@ -1125,18 +1103,68 @@ int cbmc_parseoptionst::doit_incremental()
   return 0;
 }
 
-int cbmc_parseoptionst::do_base_case(
-  optionst &opts, goto_functionst &goto_functions, BigInt k_step)
+int esbmc_parseoptionst::doit_termination()
+{
+  optionst opts;
+  get_command_line_options(opts);
+
+  if(get_goto_program(opts, goto_functions))
+    return 6;
+
+  if(cmdline.isset("show-claims"))
+  {
+    const namespacet ns(context);
+    show_claims(ns, get_ui(), goto_functions);
+    return 0;
+  }
+
+  if(set_claims(goto_functions))
+    return 7;
+
+  // Get max number of iterations
+  u_int max_k_step = strtoul(cmdline.getval("max-k-step"), nullptr, 10);
+
+  // The option unlimited-k-steps set the max number of iterations to UINT_MAX
+  if(cmdline.isset("unlimited-k-steps"))
+    max_k_step = UINT_MAX;
+
+  // Get the increment
+  unsigned k_step_inc = strtoul(cmdline.getval("k-step"), nullptr, 10);
+
+  for(BigInt k_step = 1; k_step <= max_k_step; k_step += k_step_inc)
+  {
+    std::cout << "\n*** Iteration number ";
+    std::cout << k_step;
+    std::cout << " ***\n";
+
+    if(!do_forward_condition(opts, goto_functions, k_step))
+      return false;
+  }
+
+  status("Unable to prove or falsify the program, giving up.");
+  status("VERIFICATION UNKNOWN");
+
+  return 0;
+}
+
+int esbmc_parseoptionst::do_base_case(
+  optionst &opts,
+  const goto_functionst &goto_functions,
+  const BigInt &k_step)
 {
   opts.set_option("base-case", true);
   opts.set_option("forward-condition", false);
   opts.set_option("inductive-step", false);
+
+  opts.set_option("no-unwinding-assertions", true);
+  opts.set_option("partial-loops", false);
 
   bmct bmc(goto_functions, opts, context, ui_message_handler);
   set_verbosity_msg(bmc);
 
   bmc.options.set_option("unwind", integer2string(k_step));
 
+  std::cout << "*** Checking base case\n";
   switch(do_bmc(bmc))
   {
     case smt_convt::P_UNSATISFIABLE:
@@ -1145,7 +1173,7 @@ int cbmc_parseoptionst::do_base_case(
       break;
 
     case smt_convt::P_SATISFIABLE:
-      std::cout << "\nBug found at k = " << k_step << "\n";
+      std::cout << "\nBug found (k = " << k_step << ")\n";
       return true;
 
     default:
@@ -1156,8 +1184,10 @@ int cbmc_parseoptionst::do_base_case(
   return false;
 }
 
-int cbmc_parseoptionst::do_forward_condition(
-  optionst &opts, goto_functionst &goto_functions, BigInt k_step)
+int esbmc_parseoptionst::do_forward_condition(
+  optionst &opts,
+  const goto_functionst &goto_functions,
+  const BigInt &k_step)
 {
   if(opts.get_bool_option("disable-forward-condition"))
     return true;
@@ -1166,12 +1196,28 @@ int cbmc_parseoptionst::do_forward_condition(
   opts.set_option("forward-condition", true);
   opts.set_option("inductive-step", false);
 
+  opts.set_option("no-unwinding-assertions", false);
+  opts.set_option("partial-loops", false);
+
+  // We have to disable assertions in the forward condition but
+  // restore the previous value after it
+  bool no_assertions = opts.get_bool_option("no-assertions");
+
+  // Turn assertions off
+  opts.set_option("no-assertions", true);
+
   bmct bmc(goto_functions, opts, context, ui_message_handler);
   set_verbosity_msg(bmc);
 
   bmc.options.set_option("unwind", integer2string(k_step));
 
-  switch(do_bmc(bmc))
+  std::cout << "*** Checking forward condition\n";
+  auto res = do_bmc(bmc);
+
+  // Restore the no assertion flag, before checking the other steps
+  opts.set_option("no-assertions", no_assertions);
+
+  switch(res)
   {
     case smt_convt::P_SATISFIABLE:
     case smt_convt::P_SMTLIB:
@@ -1191,8 +1237,10 @@ int cbmc_parseoptionst::do_forward_condition(
   return true;
 }
 
-int cbmc_parseoptionst::do_inductive_step(
-  optionst &opts, goto_functionst &goto_functions, BigInt k_step)
+int esbmc_parseoptionst::do_inductive_step(
+  optionst &opts,
+  const goto_functionst &goto_functions,
+  const BigInt &k_step)
 {
   // Don't run inductive step for k_step == 1
   if(k_step == 1)
@@ -1205,39 +1253,36 @@ int cbmc_parseoptionst::do_inductive_step(
   opts.set_option("forward-condition", false);
   opts.set_option("inductive-step", true);
 
+  opts.set_option("no-unwinding-assertions", true);
+  opts.set_option("partial-loops", true);
+
   bmct bmc(goto_functions, opts, context, ui_message_handler);
   set_verbosity_msg(bmc);
 
   bmc.options.set_option("unwind", integer2string(k_step));
 
-  try {
-    switch(do_bmc(bmc))
-    {
-      case smt_convt::P_SATISFIABLE:
-      case smt_convt::P_SMTLIB:
-      case smt_convt::P_ERROR:
-        break;
-
-      case smt_convt::P_UNSATISFIABLE:
-        std::cout << "\nSolution found by the inductive step "
-                  << "(k = " << k_step << ")\n";
-        return false;
-
-      default:
-        std::cout << "Unknown BMC result\n";
-        abort();
-    }
-  }
-  catch(...)
+  std::cout << "*** Checking inductive step\n";
+  switch(do_bmc(bmc))
   {
-    // If there is a dynamic allocation during goto symex, an
-    // exception will be thrown and the inductive step is disabled
+    case smt_convt::P_SATISFIABLE:
+    case smt_convt::P_SMTLIB:
+    case smt_convt::P_ERROR:
+      break;
+
+    case smt_convt::P_UNSATISFIABLE:
+      std::cout << "\nSolution found by the inductive step "
+                << "(k = " << k_step << ")\n";
+      return false;
+
+    default:
+      std::cout << "Unknown BMC result\n";
+      abort();
   }
 
   return true;
 }
 
-bool cbmc_parseoptionst::set_claims(goto_functionst &goto_functions)
+bool esbmc_parseoptionst::set_claims(goto_functionst &goto_functions)
 {
   try
   {
@@ -1265,7 +1310,7 @@ bool cbmc_parseoptionst::set_claims(goto_functionst &goto_functions)
   return false;
 }
 
-bool cbmc_parseoptionst::get_goto_program(
+bool esbmc_parseoptionst::get_goto_program(
   optionst &options,
   goto_functionst &goto_functions)
 {
@@ -1361,7 +1406,7 @@ bool cbmc_parseoptionst::get_goto_program(
   return false;
 }
 
-void cbmc_parseoptionst::preprocessing()
+void esbmc_parseoptionst::preprocessing()
 {
   try
   {
@@ -1401,262 +1446,7 @@ void cbmc_parseoptionst::preprocessing()
   }
 }
 
-void cbmc_parseoptionst::add_property_monitors(goto_functionst &goto_functions, namespacet &ns __attribute__((unused)))
-{
-  std::map<std::string, std::string> strings;
-
-  context.foreach_operand(
-    [this, &strings] (const symbolt& s)
-    {
-      if (s.name.as_string().find("__ESBMC_property_") != std::string::npos)
-      {
-        // Munge back into the shape of an actual string
-        std::string str;
-        forall_operands(iter2, s.value) {
-          char c = (char)strtol(iter2->value().as_string().c_str(), nullptr, 2);
-          if (c != 0)
-            str += c;
-          else
-            break;
-        }
-
-        strings[s.name.as_string()] = str;
-      }
-    }
-  );
-
-  std::map<std::string, std::pair<std::set<std::string>, expr2tc> > monitors;
-  std::map<std::string, std::string>::const_iterator str_it;
-  for (str_it = strings.begin(); str_it != strings.end(); str_it++) {
-    if (str_it->first.find("$type") == std::string::npos) {
-      std::set<std::string> used_syms;
-      expr2tc main_expr;
-      std::string prop_name = str_it->first.substr(20, std::string::npos);
-      main_expr = calculate_a_property_monitor(std::move(prop_name), strings, used_syms);
-      monitors[prop_name] = std::pair<std::set<std::string>, expr2tc>
-                                      (used_syms, main_expr);
-    }
-  }
-
-  if (monitors.size() == 0)
-    return;
-
-  Forall_goto_functions(f_it, goto_functions) {
-    goto_functiont &func = f_it->second;
-    goto_programt &prog = func.body;
-    Forall_goto_program_instructions(p_it, prog) {
-      add_monitor_exprs(p_it, prog.instructions, monitors);
-    }
-  }
-
-  // Find main function; find first function call; insert updates to each
-  // property expression. This makes sure that there isn't inconsistent
-  // initialization of each monitor boolean.
-  goto_functionst::function_mapt::iterator f_it = goto_functions.function_map.find("__ESBMC_main");
-  assert(f_it != goto_functions.function_map.end());
-  Forall_goto_program_instructions(p_it, f_it->second.body) {
-    if (p_it->type == FUNCTION_CALL) {
-      const code_function_call2t &func_call =
-        to_code_function_call2t(p_it->code);
-      if (is_symbol2t(func_call.function) &&
-          to_symbol2t(func_call.function).thename == "main")
-        continue;
-
-      // Insert initializers for each monitor expr.
-      std::map<std::string, std::pair<std::set<std::string>, expr2tc> >
-        ::const_iterator it;
-      for (it = monitors.begin(); it != monitors.end(); it++) {
-        goto_programt::instructiont new_insn;
-        new_insn.type = ASSIGN;
-        std::string prop_name = it->first + "_status";
-        typecast2tc cast(get_int_type(32), it->second.second);
-        code_assign2tc assign(symbol2tc(get_int_type(32), prop_name), cast);
-        new_insn.code = assign;
-        new_insn.function = p_it->function;
-
-        // new_insn location field not set - I believe it gets numbered later.
-        f_it->second.body.instructions.insert(p_it, new_insn);
-      }
-
-      break;
-    }
-  }
-}
-
-static void replace_symbol_names(expr2tc &e, std::string prefix, std::map<std::string, std::string> &strings, std::set<std::string> &used_syms)
-{
-
-  if (is_symbol2t(e)) {
-    symbol2t &thesym = to_symbol2t(e);
-    std::string sym = thesym.get_symbol_name();
-
-    used_syms.insert(sym);
-  } else {
-    e->Foreach_operand([&prefix, &strings, &used_syms] (expr2tc &e)
-      {
-        if (!is_nil_expr(e))
-          replace_symbol_names(e, prefix, strings, used_syms);
-      }
-    );
-  }
-}
-
-expr2tc cbmc_parseoptionst::calculate_a_property_monitor(const std::string&& name, std::map<std::string, std::string> &strings, std::set<std::string> &used_syms)
-{
-  exprt main_expr;
-  std::map<std::string, std::string>::const_iterator it;
-
-  namespacet ns(context);
-  languagest languages(ns, MODE_C);
-
-  std::string expr_str = strings["__ESBMC_property_" + name];
-  std::string dummy_str;
-
-  languages.to_expr(expr_str, dummy_str, main_expr, ui_message_handler);
-
-  expr2tc new_main_expr;
-  migrate_expr(main_expr, new_main_expr);
-  replace_symbol_names(new_main_expr, name, strings, used_syms);
-
-  return new_main_expr;
-}
-
-void cbmc_parseoptionst::add_monitor_exprs(goto_programt::targett insn, goto_programt::instructionst &insn_list, std::map<std::string, std::pair<std::set<std::string>, expr2tc> >monitors)
-{
-
-  // We've been handed an instruction, look for assignments to the
-  // symbol we're looking for. When we find one, append a goto instruction that
-  // re-evaluates a proposition expression. Because there can be more than one,
-  // we put re-evaluations in atomic blocks.
-
-  if (!insn->is_assign())
-    return;
-
-  code_assign2t &assign = to_code_assign2t(insn->code);
-
-  // Don't allow propositions about things like the contents of an array and
-  // suchlike.
-  if (!is_symbol2t(assign.target))
-    return;
-
-  symbol2t &sym = to_symbol2t(assign.target);
-
-  // Is this actually an assignment that we're interested in?
-  std::map<std::string, std::pair<std::set<std::string>, expr2tc> >::const_iterator it;
-  std::string sym_name = sym.get_symbol_name();
-  std::set<std::pair<std::string, expr2tc> > triggered;
-  for (it = monitors.begin(); it != monitors.end(); it++) {
-    if (it->second.first.find(sym_name) == it->second.first.end())
-      continue;
-
-    triggered.insert(std::pair<std::string, expr2tc>(it->first, it->second.second));
-  }
-
-  if (triggered.empty())
-    return;
-
-  goto_programt::instructiont new_insn;
-
-  new_insn.type = ATOMIC_BEGIN;
-  new_insn.function = insn->function;
-  insn_list.insert(insn, new_insn);
-
-  insn++;
-
-  new_insn.type = ASSIGN;
-  std::set<std::pair<std::string, expr2tc> >::const_iterator trig_it;
-  for (trig_it = triggered.begin(); trig_it != triggered.end(); trig_it++) {
-    std::string prop_name = trig_it->first + "_status";
-    typecast2tc hack_cast(get_int_type(32), trig_it->second);
-    symbol2tc newsym(get_int_type(32), prop_name);
-    new_insn.code = code_assign2tc(newsym, hack_cast);
-    new_insn.function = insn->function;
-
-    insn_list.insert(insn, new_insn);
-  }
-
-  new_insn.type = FUNCTION_CALL;
-  symbol2tc func_sym(get_empty_type(), "__ESBMC_switch_to_monitor");
-  std::vector<expr2tc> args;
-  new_insn.code = code_function_call2tc(expr2tc(), func_sym, args);
-  new_insn.function = insn->function;
-  insn_list.insert(insn, new_insn);
-
-  new_insn.type = ATOMIC_END;
-  new_insn.function = insn->function;
-  insn_list.insert(insn, new_insn);
-}
-
-static unsigned int calc_globals_used(const namespacet &ns, const expr2tc &expr)
-{
-
-  if (is_nil_expr(expr))
-    return 0;
-
-  if (!is_symbol2t(expr)) {
-    unsigned int globals = 0;
-
-    expr->foreach_operand([&globals, &ns] (const expr2tc &e) {
-      globals += calc_globals_used(ns, e);
-      }
-    );
-
-    return globals;
-  }
-
-  std::string identifier = to_symbol2t(expr).get_symbol_name();
-  const symbolt &sym = ns.lookup(identifier);
-
-  if (identifier == "__ESBMC_alloc" || identifier == "__ESBMC_alloc_size")
-    return 0;
-
-  if (sym.static_lifetime || sym.type.is_dynamic_set())
-    return 1;
-
-  return 0;
-}
-
-void cbmc_parseoptionst::print_ileave_points(namespacet &ns,
-                             goto_functionst &goto_functions)
-{
-  bool print_insn;
-
-  forall_goto_functions(fit, goto_functions) {
-    forall_goto_program_instructions(pit, fit->second.body) {
-      print_insn = false;
-      switch (pit->type) {
-        case GOTO:
-        case ASSUME:
-        case ASSERT:
-          if (calc_globals_used(ns, pit->guard) > 0)
-            print_insn = true;
-          break;
-        case ASSIGN:
-          if (calc_globals_used(ns, pit->code) > 0)
-            print_insn = true;
-          break;
-        case FUNCTION_CALL:
-          {
-            code_function_call2t deref_code =
-              to_code_function_call2t(pit->code);
-
-            if (is_symbol2t(deref_code.function) &&
-                to_symbol2t(deref_code.function).get_symbol_name()
-                            == "__ESBMC_yield")
-              print_insn = true;
-          }
-          break;
-        default:
-          break;
-      }
-
-      if (print_insn)
-        pit->output_instruction(ns, pit->function, std::cout);
-    }
-  }
-}
-
-bool cbmc_parseoptionst::read_goto_binary(
+bool esbmc_parseoptionst::read_goto_binary(
   goto_functionst &goto_functions)
 {
   std::ifstream in(cmdline.getval("binary"), std::ios::binary);
@@ -1676,7 +1466,7 @@ bool cbmc_parseoptionst::read_goto_binary(
   return false;
 }
 
-bool cbmc_parseoptionst::process_goto_program(
+bool esbmc_parseoptionst::process_goto_program(
   optionst &options,
   goto_functionst &goto_functions)
 {
@@ -1697,16 +1487,9 @@ bool cbmc_parseoptionst::process_goto_program(
        || cmdline.isset("k-induction")
        || cmdline.isset("k-induction-parallel"))
     {
-      // If the inductive step was disabled during the conversion,
-      // there is no point spending time trying to convert it,
-      // so just give up and return
-      if(options.get_bool_option("disable-inductive-step"))
-        return false;
-
       goto_k_induction(
         goto_functions,
         context,
-        options,
         ui_message_handler);
 
       // Warn the user if the forward condition was disabled
@@ -1742,9 +1525,6 @@ bool cbmc_parseoptionst::process_goto_program(
       goto_functions, ns, context, options, value_set_analysis);
 #endif
 
-    // add re-evaluations of monitored properties
-    add_property_monitors(goto_functions, ns);
-
     // remove skips
     remove_skip(goto_functions);
 
@@ -1773,8 +1553,7 @@ bool cbmc_parseoptionst::process_goto_program(
         context,
         goto_functions);
 
-      value_set_analysis.
-        update(goto_functions);
+      value_set_analysis.update(goto_functions);
     }
 
     if(cmdline.isset("unroll-loops"))
@@ -1796,12 +1575,6 @@ bool cbmc_parseoptionst::process_goto_program(
     if(cmdline.isset("show-loops"))
     {
       show_loop_numbers(get_ui(), goto_functions);
-      return true;
-    }
-
-    if (cmdline.isset("show-ileave-points"))
-    {
-      print_ileave_points(ns, goto_functions);
       return true;
     }
 
@@ -1834,7 +1607,7 @@ bool cbmc_parseoptionst::process_goto_program(
   return false;
 }
 
-int cbmc_parseoptionst::do_bmc(bmct &bmc)
+int esbmc_parseoptionst::do_bmc(bmct &bmc)
 {
   bmc.set_ui(get_ui());
 
@@ -1857,7 +1630,7 @@ int cbmc_parseoptionst::do_bmc(bmct &bmc)
   return res;
 }
 
-void cbmc_parseoptionst::help()
+void esbmc_parseoptionst::help()
 {
   std::cout <<
     "\n"
@@ -1915,8 +1688,7 @@ void cbmc_parseoptionst::help()
     " --16, --32, --64             set width of machine word (default is 64)\n"
     " --unsigned-char              make \"char\" unsigned by default\n"
     " --version                    show current ESBMC version and exit\n"
-    " --witness-output filename    generate a verification result witness in GraphML format\n"
-    " --witness-detailed           generate line offset when generating a witness (linux only)\n"
+    " --witness-output filename    generate the verification result witness in GraphML format\n"
     " --old-frontend               parse source files using our old frontend (deprecated)\n"
     " --result-only                do not print the counter-example\n"
     #ifdef _WIN32
@@ -1951,6 +1723,7 @@ void cbmc_parseoptionst::help()
     "\nIncremental BMC\n"
     " --falsification              incremental loop unwinding for bug searching\n"
     " --incremental-bmc            incremental loop unwinding verification\n"
+    " --termination                incremental loop unwinding assertion verification\n"
     " --k-step nr                  set k increment (default is 1)\n"
     " --max-k-step nr              set max number of iteration (default is 50)\n"
     " --unlimited-k-steps          set max number of iteration to UINT_MAX\n"
@@ -1998,7 +1771,6 @@ void cbmc_parseoptionst::help()
     " --k-induction                prove by k-induction \n"
     " --k-induction-parallel       prove by k-induction, running each step on a separate\n"
     "                              process\n"
-    " --constrain-all-states       remove all redundant states in the inductive step\n"
     " --k-step nr                  set k increment (default is 1)\n"
     " --max-k-step nr              set max number of iteration (default is 50)\n"
     " --unlimited-k-steps          set max number of iteration to UINT_MAX\n"
@@ -2013,7 +1785,6 @@ void cbmc_parseoptionst::help()
     "\nConcurrency checking\n"
     " --context-bound nr           limit number of context switches for each thread \n"
     " --state-hashing              enable state-hashing, prunes duplicate states\n"
-    " --control-flow-test          enable context switch before control flow tests\n"
     " --no-por                     do not do partial order reduction\n"
     " --all-runs                   check all interleavings, even if a bug was already found\n"
 

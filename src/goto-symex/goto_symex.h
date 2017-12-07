@@ -58,14 +58,16 @@ public:
   /** Records for dynamically allocated blobs of memory. */
   class allocated_obj {
   public:
-    allocated_obj(const expr2tc &s, const guardt &g, const bool a)
-      : obj(s), alloc_guard(g), auto_deallocd(a) { }
+    allocated_obj(const expr2tc &s, const guardt &g, const bool a, const std::string n)
+      : obj(s), alloc_guard(g), auto_deallocd(a), name(n) { }
     /** Symbol identifying the pointer that was allocated. Must have ptr type */
     expr2tc obj;
     /** Guard when allocation occured. */
     guardt alloc_guard;
     /** Record if the object is automatically desallocated (allocated with alloca). */
     bool auto_deallocd;
+    /** The object name */
+    std::string name;
   };
 
   friend class symex_dereference_statet;
@@ -243,7 +245,7 @@ protected:
    *  @param unwind Number of unwinds that have already occured.
    *  @return True if we've unwound past the unwinding limit.
    */
-  bool get_unwind(const symex_targett::sourcet &source, BigInt unwind);
+  bool get_unwind(const symex_targett::sourcet &source, const BigInt &unwind);
 
   /**
    *  Encode unwinding assertions and assumption.
@@ -458,12 +460,18 @@ protected:
    *  equivalent uses of WITH, or byte_update, and so forth. The end result is
    *  a single new value to be bound to a new symbol.
    *  @param code Code to assign; with lhs and rhs.
+   *  @param type Assignment type, visible by default
+   *  @param guard A guard for the assignment, true by default
    */
-  virtual void symex_assign(const expr2tc &code);
+  virtual void symex_assign(
+    const expr2tc &code,
+    symex_targett::assignment_typet type = symex_targett::STATE,
+    const guardt &guard = guardt());
 
   /** Recursively perform symex assign. @see symex_assign */
   void symex_assign_rec(
     const expr2tc &lhs,
+    const expr2tc &full_lhs,
     expr2tc &rhs,
     guardt &guard,
     symex_targett::assignment_typet type);
@@ -473,11 +481,13 @@ protected:
    *  Renames further, performs goto_symex_statet::assignment and symex target
    *  assignments.
    *  @param lhs Symbol to assign to
+   *  @param full_lhs The original assignment symbol
    *  @param rhs Value to assign to symbol
    *  @param guard Guard; intent unknown
    */
   void symex_assign_symbol(
     const expr2tc &lhs,
+    const expr2tc &full_lhs,
     expr2tc &rhs,
     guardt &guard,
     symex_targett::assignment_typet type);
@@ -496,24 +506,49 @@ protected:
    *  the constant_struct irep is used).
    *
    *  @param lhs Symbol to assign to
+   *  @param full_lhs The original assignment symbol
    *  @param rhs Value to assign to symbol
    *  @param guard Guard; intent unknown
    */
   void symex_assign_structure(
     const expr2tc &lhs,
+    const expr2tc &full_lhs,
     expr2tc &rhs,
     guardt &guard,
     symex_targett::assignment_typet type);
 
   /**
+   *  Perform assignment to an extract irep.
+   *
+   *  Currently these extract assignments can crop up when we're assigning into
+   *  a bitfield. We can't rewrite the assignment in the front end, because
+   *  there isn't enough context there to know whether an expression is on the
+   *  lhs or rhs of an expression. Thus we have to take the operand of the
+   *  extract irep, and read/modify/write it.
+   *
+   *  @param lhs Extract irep to assign into
+   *  @param rhs Value to assign to bitfield
+   *  @param guard Guard of the current assignment
+   */
+  void symex_assign_extract(
+    const expr2tc &lhs,
+    const expr2tc &full_lhs,
+    expr2tc &rhs,
+    guardt &guard,
+    symex_targett::assignment_typet type);
+
+
+  /**
    *  Perform assignment to a typecast irep.
    *  This just ends up moving the typecast from the lhs to the rhs.
    *  @param lhs Typecast to assign to
+   *  @param full_lhs The original assignment symbol
    *  @param rhs Value to assign to lhs
    *  @param guard Guard; intent unknown
    */
   void symex_assign_typecast(
     const expr2tc &lhs,
+    const expr2tc &full_lhs,
     expr2tc &rhs,
     guardt &guard,
     symex_targett::assignment_typet type);
@@ -524,11 +559,13 @@ protected:
    *  destination. rhs converted to a WITH statement, updating the contents of
    *  the original array with the value of the original rhs.
    *  @param lhs Array to assign to
+   *  @param full_lhs The original assignment symbol
    *  @param rhs Value to assign to symbol
    *  @param guard Guard; intent unknown
    */
   void symex_assign_array(
     const expr2tc &lhs,
+    const expr2tc &full_lhs,
     expr2tc &rhs,
     guardt &guard,
     symex_targett::assignment_typet type);
@@ -538,11 +575,13 @@ protected:
    *  Exactly like with arrays, but with structs and members.
    *  @see symex_assign_array
    *  @param lhs Struct to assign to
+   *  @param full_lhs The original assignment symbol
    *  @param rhs Value to assign to lhs
    *  @param guard Guard; intent unknown
    */
   void symex_assign_member(
     const expr2tc &lhs,
+    const expr2tc &full_lhs,
     expr2tc &rhs,
     guardt &guard,
     symex_targett::assignment_typet type);
@@ -552,11 +591,13 @@ protected:
    *  This ends up being two assignments, one to one branch of the if, the
    *  other to the other. The appropriate guard is executed in either case.
    *  @param lhs "If" to assign to
+   *  @param full_lhs The original assignment symbol
    *  @param rhs Value to assign to lhs
    *  @param guard Guard; intent unknown
    */
   void symex_assign_if(
     const expr2tc &lhs,
+    const expr2tc &full_lhs,
     expr2tc &rhs,
     guardt &guard,
     symex_targett::assignment_typet type);
@@ -567,11 +608,13 @@ protected:
    *  right hand side at the appropriate position. Currently a problem , as
    *  assignments of something that's bigger than a byte fails.
    *  @param lhs Byte extract to assign to
+   *  @param full_lhs The original assignment symbol
    *  @param rhs Value to assign to lhs
    *  @param guard Guard; intent unknown
    */
   void symex_assign_byte_extract(
     const expr2tc &lhs,
+    const expr2tc &full_lhs,
     expr2tc &rhs,
     guardt &guard,
     symex_targett::assignment_typet type);
@@ -583,11 +626,13 @@ protected:
    *  expression, this means that we have to decompose the right hand side into
    *  a series of byte assignments.
    *  @param lhs Concat to assign to
+   *  @param full_lhs The original assignment symbol
    *  @param rhs Value to assign to lhs
    *  @param guard Assignment guard.
    */
   void symex_assign_concat(
     const expr2tc &lhs,
+    const expr2tc &full_lhs,
     expr2tc &rhs,
     guardt &guard,
     symex_targett::assignment_typet type);
@@ -645,7 +690,7 @@ protected:
    */
   irep_idt guard_identifier_s;
   /** Loop numbers. */
-  std::stack<unsigned> loop_numbers;
+  unsigned first_loop;
   /** Number of assertions executed. */
   unsigned total_claims;
   /** Number of assertions remaining to be discharged. */
@@ -698,9 +743,6 @@ protected:
 
   /** Flag to indicate if we are go into the unexpected flow. */
   bool inside_unexpected;
-
-  /** Flag to indicate if we have an unwinding recursion assumption. */
-  bool unwinding_recursion_assumption;
 
   /** Depth limit, as given by the --depth option */
   unsigned long depth_limit;

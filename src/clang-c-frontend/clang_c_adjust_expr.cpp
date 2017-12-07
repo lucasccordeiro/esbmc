@@ -35,9 +35,19 @@ bool clang_c_adjust::adjust()
     }
   );
 
+  // Adjust types first, so that symbolic-type resolution always receives
+  // fixed up types.
   Forall_symbol_list(it, symbol_list)
   {
     symbolt &symbol = **it;
+    if(symbol.is_type)
+      adjust_type(symbol.type);
+  }
+
+  Forall_symbol_list(it, symbol_list)
+  {
+    symbolt &symbol = **it;
+    adjust_type(symbol.type);
 
     if(symbol.is_type)
       continue;
@@ -59,6 +69,9 @@ void clang_c_adjust::adjust_symbol(symbolt& symbol)
 
 void clang_c_adjust::adjust_expr(exprt& expr)
 {
+
+  adjust_type(expr.type());
+
   if(expr.id() == "sideeffect")
   {
     adjust_side_effect(to_side_effect_expr(expr));
@@ -247,7 +260,7 @@ void clang_c_adjust::adjust_expr_binary_arithmetic(exprt& expr)
   const typet type0=ns.follow(op0.type());
   const typet type1=ns.follow(op1.type());
 
-  if(expr.id()=="shr")
+  if(expr.id()=="shr" || expr.id() == "shl")
   {
     gen_typecast_arithmetic(ns, op0);
     gen_typecast_arithmetic(ns, op1);
@@ -458,6 +471,7 @@ void clang_c_adjust::adjust_sizeof(exprt& expr)
   else if(expr.operands().size()==1)
   {
     type.swap(expr.op0().type());
+    adjust_type(type);
   }
   else
   {

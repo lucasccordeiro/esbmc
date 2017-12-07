@@ -15,7 +15,6 @@ Author: Daniel Kroening, kroening@cs.cmu.edu
 #include <clang-c-frontend/clang_c_language.h>
 #include <clang-c-frontend/clang_c_main.h>
 #include <clang-c-frontend/expr2c.h>
-#include <fstream>
 #include <sstream>
 #include <util/c_link.h>
 
@@ -307,16 +306,4 @@ bool clang_c_languaget::from_type(
 {
   code=type2c(type, ns, fullname);
   return false;
-}
-
-bool clang_c_languaget::to_expr(
-  const std::string &code __attribute__((unused)),
-  const std::string &module __attribute__((unused)),
-  exprt &expr __attribute__((unused)),
-  message_handlert &message_handler __attribute__((unused)),
-  const namespacet &ns __attribute__((unused)))
-{
-  std::cout << "Method " << __PRETTY_FUNCTION__ << " not implemented yet" << std::endl;
-  abort();
-  return true;
 }

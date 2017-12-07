@@ -10,8 +10,6 @@ Author: Daniel Kroening, kroening@cs.cmu.edu
 #include <clang/Tooling/Tooling.h>
 #include <c2goto/cprover_library.h>
 #include <clang-cpp-frontend/clang_cpp_language.h>
-#include <fstream>
-#include <sstream>
 
 languaget *new_clang_cpp_language()
 {
@@ -94,18 +92,6 @@ bool clang_cpp_languaget::from_type(
   std::string &code __attribute__((unused)),
   const namespacet &ns __attribute__((unused)),
   bool fullname __attribute__((unused)))
-{
-  std::cout << "Method " << __PRETTY_FUNCTION__ << " not implemented yet" << std::endl;
-  abort();
-  return true;
-}
-
-bool clang_cpp_languaget::to_expr(
-  const std::string &code __attribute__((unused)),
-  const std::string &module __attribute__((unused)),
-  exprt &expr __attribute__((unused)),
-  message_handlert &message_handler __attribute__((unused)),
-  const namespacet &ns __attribute__((unused)))
 {
   std::cout << "Method " << __PRETTY_FUNCTION__ << " not implemented yet" << std::endl;
   abort();

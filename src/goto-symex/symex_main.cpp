@@ -26,10 +26,18 @@
 #include <vector>
 
 void
-goto_symext::claim(const expr2tc &claim_expr, const std::string &msg) {
+goto_symext::claim(const expr2tc &claim_expr, const std::string &msg)
+{
+  if(inductive_step && first_loop)
+  {
 
-  if (unwinding_recursion_assumption)
-    return ;
+    BigInt unwind = cur_state->loop_iterations[first_loop];
+    if(unwind < (max_unwind - 1))
+    {
+      assume(claim_expr);
+      return;
+    }
+  }
 
   // Can happen when evaluating certain special intrinsics. Gulp.
   if (cur_state->guard.is_false())
@@ -55,12 +63,24 @@ goto_symext::claim(const expr2tc &claim_expr, const std::string &msg) {
 }
 
 void
-goto_symext::assume(const expr2tc &assumption)
+goto_symext::assume(const expr2tc &the_assumption)
 {
+  expr2tc assumption = the_assumption;
+  cur_state->rename(assumption);
+  do_simplify(assumption);
+
+  if (is_true(assumption))
+    return;
+
+  cur_state->guard.guard_expr(assumption);
 
   // Irritatingly, assumption destroys its expr argument
   expr2tc tmp_guard = cur_state->guard.as_expr();
   target->assumption(tmp_guard, assumption, cur_state->source);
+
+  // If we're assuming false, make the guard for the following statement false
+  if(is_false(the_assumption))
+    cur_state->guard.make_false();
 }
 
 boost::shared_ptr<goto_symext::symex_resultt>
@@ -84,6 +104,10 @@ goto_symext::symex_step(reachability_treet & art)
       cur_state->guard.add(gen_false_expr());
     cur_state->depth++;
   }
+
+  // Remember the first loop we're entering
+  if(inductive_step && instruction.loop_number && !first_loop)
+    first_loop = instruction.loop_number;
 
   // actually do instruction
   switch (instruction.type) {
@@ -267,18 +291,7 @@ void goto_symext::symex_assume()
   dereference(cond, dereferencet::READ);
   replace_dynamic_allocation(cond);
 
-  cur_state->rename(cond);
-  do_simplify(cond);
-
-  if (is_true(cond))
-    return;
-
-  cur_state->guard.guard_expr(cond);
   assume(cond);
-
-  // If we're assuming false, make the guard for the following statement false
-  if(is_false(cond))
-    cur_state->guard.make_false();
 }
 
 void goto_symext::symex_assert()
@@ -286,25 +299,10 @@ void goto_symext::symex_assert()
   if (cur_state->guard.is_false())
     return;
 
-  if(cur_state->source.pc->location.user_provided()
-     && loop_numbers.size()
-     && inductive_step)
-  {
-    statet::framet &frame = cur_state->top();
-    BigInt unwind = frame.loop_iterations[loop_numbers.top()];
-
-    if(unwind < (max_unwind - 1))
-    {
-      symex_assume();
-      return;
-    }
-  }
-
   // Don't convert if it's an user provided assertion and we're running in
   // no assertion mode or forward condition
-  if(cur_state->source.pc->location.user_provided())
-    if(no_assertions || forward_condition)
-      return;
+  if(cur_state->source.pc->location.user_provided() && no_assertions)
+    return;
 
   std::string msg = cur_state->source.pc->location.comment().as_string();
   if (msg == "") msg = "assertion";
@@ -380,13 +378,16 @@ goto_symext::finish_formula()
 
     // Assert that the allocated object was freed.
     deallocated_obj2tc deallocd(it.obj);
+
     equality2tc eq(deallocd, gen_true_expr());
     replace_dynamic_allocation(eq);
     it.alloc_guard.guard_expr(eq);
     cur_state->rename(eq);
-    target->assertion(it.alloc_guard.as_expr(), eq,
-                      "dereference failure: forgotten memory",
-                      std::vector<stack_framet>(), cur_state->source);
+    target->assertion(
+      it.alloc_guard.as_expr(), eq,
+      "dereference failure: forgotten memory: " + it.name,
+      cur_state->gen_stack_trace(), cur_state->source);
+
     total_claims++;
     remaining_claims++;
   }

@@ -46,6 +46,7 @@ goto_symex_statet::operator=(const goto_symex_statet &state)
   global_guard = state.global_guard;
   source = state.source;
   variable_instance_nums = state.variable_instance_nums;
+  loop_iterations = state.loop_iterations;
   function_unwind = state.function_unwind;
   use_value_set = state.use_value_set;
   call_stack = state.call_stack;
@@ -210,7 +211,7 @@ void goto_symex_statet::assignment(
   }
 }
 
-void goto_symex_statet::rename(expr2tc &expr)
+void goto_symex_statet::rename(expr2tc &expr, bool rename_only)
 {
   // rename all the symbols with their last known value
 
@@ -221,7 +222,7 @@ void goto_symex_statet::rename(expr2tc &expr)
   {
     type2tc origtype = expr->type;
     top().level1.rename(expr);
-    level2.rename(expr);
+    level2.rename(expr, rename_only);
     fixup_renamed_type(expr, origtype);
   }
   else if (is_address_of2t(expr))
@@ -232,8 +233,8 @@ void goto_symex_statet::rename(expr2tc &expr)
   else
   {
     // do this recursively
-    expr->Foreach_operand([this] (expr2tc &e) {
-        rename(e);
+    expr->Foreach_operand([this, &rename_only] (expr2tc &e) {
+        rename(e, rename_only);
       }
     );
   }

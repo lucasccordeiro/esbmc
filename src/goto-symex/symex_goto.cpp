@@ -62,29 +62,18 @@ goto_symext::symex_goto(const expr2tc &old_guard)
     cur_state->source.pc->location_number <
     goto_target->location_number;
 
-  // Check if we are inside a loop, during inductive step
-  if(inductive_step && (instruction.loop_number != 0))
-  {
-    // We just entered the loop, save the loop number
-    if(forward)
-      loop_numbers.push(instruction.loop_number);
-    else
-    {
-      // We are leaving the loop, remove from stack
-      assert(instruction.loop_number == loop_numbers.top());
-      loop_numbers.pop();
-    }
-  }
-
-  statet::framet &frame=cur_state->top();
   if (new_guard_false)
   {
     // reset unwinding counter
     if(instruction.is_backwards_goto())
-      frame.loop_iterations[instruction.loop_number] = 0;
+      cur_state->loop_iterations[instruction.loop_number] = 0;
 
     // next instruction
     cur_state->source.pc++;
+
+    // Reset loop counter
+    if(instruction.loop_number == first_loop)
+      first_loop = 0;
 
     return; // nothing to do
   }
@@ -98,10 +87,11 @@ goto_symext::symex_goto(const expr2tc &old_guard)
   // backwards?
   if (!forward)
   {
-    BigInt &unwind = frame.loop_iterations[instruction.loop_number];
+    BigInt &unwind = cur_state->loop_iterations[instruction.loop_number];
     ++unwind;
 
-    if (get_unwind(cur_state->source, unwind)) {
+    if (get_unwind(cur_state->source, unwind))
+    {
       loop_bound_exceeded(new_guard);
 
       // reset unwinding
@@ -109,6 +99,11 @@ goto_symext::symex_goto(const expr2tc &old_guard)
 
       // next instruction
       cur_state->source.pc++;
+
+      // Reset loop counter
+      if(instruction.loop_number == first_loop)
+        first_loop = 0;
+
       return;
     }
 
@@ -166,7 +161,11 @@ goto_symext::symex_goto(const expr2tc &old_guard)
         cur_state->gen_stack_trace(),
         symex_targett::HIDDEN);
 
+      if(is_constant_expr(new_rhs))
+        guard_expr = new_rhs;
+
       guard_expr = not2tc(guard_expr);
+      do_simplify(guard_expr);
     }
 
     not2tc not_guard_expr(guard_expr);
@@ -320,40 +319,18 @@ goto_symext::loop_bound_exceeded(const expr2tc &guard)
 {
   const irep_idt &loop_id = cur_state->source.pc->location.loopid();
 
-  expr2tc negated_cond;
+  expr2tc negated_cond = guard;
+  make_not(negated_cond);
 
-  if (is_true(guard)) {
-    negated_cond = gen_false_expr();
-  } else {
-    negated_cond = not2tc(guard);
-  }
-
-  if (base_case || inductive_step)
-  {
-    // generate unwinding assumption
-    expr2tc guarded_expr=negated_cond;
-    cur_state->guard.guard_expr(guarded_expr);
-    target->assumption(cur_state->guard.as_expr(), guarded_expr, cur_state->source);
-
-    // add to state guard to prevent further assignments
-    cur_state->guard.add(negated_cond);
-  }
-  else if (forward_condition)
-  {
-    // generate unwinding assertion
-    claim(negated_cond,
-      "unwinding assertion loop "+id2string(loop_id));
-
-    // add to state guard to prevent further assignments
-    cur_state->guard.add(negated_cond);
-  }
-  else if(!partial_loops)
+  if(!partial_loops)
   {
     if(!no_unwinding_assertions)
     {
       // generate unwinding assertion
       claim(negated_cond, "unwinding assertion loop " + id2string(loop_id));
-    } else   {
+    }
+    else
+    {
       // generate unwinding assumption, unless we permit partial loops
       expr2tc guarded_expr = negated_cond;
       cur_state->guard.guard_expr(guarded_expr);
@@ -367,7 +344,7 @@ goto_symext::loop_bound_exceeded(const expr2tc &guard)
 }
 
 bool
-goto_symext::get_unwind(const symex_targett::sourcet &source, BigInt unwind)
+goto_symext::get_unwind(const symex_targett::sourcet &source, const BigInt &unwind)
 {
   unsigned id = source.pc->loop_number;
   BigInt this_loop_max_unwind = max_unwind;
@@ -375,15 +352,17 @@ goto_symext::get_unwind(const symex_targett::sourcet &source, BigInt unwind)
   if (unwind_set.count(id) != 0)
     this_loop_max_unwind = unwind_set[id];
 
+
+  bool stop_unwind = this_loop_max_unwind != 0 && unwind >= this_loop_max_unwind;
   if (!options.get_bool_option("quiet"))
   {
-    std::string msg =
-      "Unwinding loop " + i2string(id) + " iteration " + integer2string(unwind) +
-      " " + source.pc->location.as_string();
-    std::cout << msg << std::endl;
+    std::cout << (stop_unwind ? "Not unwinding " : "Unwinding ")
+      << "loop " + i2string(cur_state->source.pc->loop_number)
+      << " iteration " + integer2string(unwind) + " "
+      << cur_state->source.pc->location.as_string() << '\n';
   }
 
-  return this_loop_max_unwind != 0 && unwind >= this_loop_max_unwind;
+  return stop_unwind;
 }
 
 hash_set_cont<irep_idt, irep_id_hash> goto_symext::body_warnings;

@@ -2046,6 +2046,15 @@ std::string expr2ct::convert_sizeof(
   return dest;
 }
 
+std::string expr2ct::convert_extract(const exprt &src)
+{
+  std::string op = convert(src.op0());
+  unsigned int upper = atoi(src.get("upper").as_string().c_str());
+  unsigned int lower = atoi(src.get("lower").as_string().c_str());
+
+  return "EXTRACT(" + op + "," + std::to_string(upper) + "," + std::to_string(lower) + ")";
+}
+
 std::string expr2ct::convert(
   const exprt &src,
   unsigned &precedence)
@@ -2473,6 +2482,9 @@ std::string expr2ct::convert(
 
   else if(src.id()=="concat")
     return convert_function(src, "CONCAT", precedence=15);
+
+  else if(src.id()=="extract")
+    return convert_extract(src);
 
   // no C language expression for internal representation
   return convert_norep(src, precedence);

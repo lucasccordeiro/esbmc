@@ -68,6 +68,14 @@ inline bool is_multi_dimensional_array(const expr2tc &e)
   return is_multi_dimensional_array(e->type);
 }
 
+inline bool is_constant_number(const expr2tc &t)
+{
+  return t->expr_id == expr2t::constant_int_id ||
+         t->expr_id == expr2t::constant_fixedbv_id ||
+         t->expr_id == expr2t::constant_floatbv_id ||
+         t->expr_id == expr2t::constant_bool_id;
+}
+
 inline bool is_constant_expr(const expr2tc &t)
 {
   return t->expr_id == expr2t::constant_int_id ||
@@ -135,13 +143,15 @@ is_false(const expr2tc &expr)
 inline expr2tc
 gen_true_expr()
 {
-  return constant_bool2tc(true);
+  static constant_bool2tc c(true);
+  return c;
 }
 
 inline expr2tc
 gen_false_expr()
 {
-  return constant_bool2tc(false);
+  static constant_bool2tc c(false);
+  return c;
 }
 
 inline expr2tc
@@ -259,10 +269,15 @@ inline bool simplify(expr2tc &expr)
 
 inline void make_not(expr2tc &expr)
 {
-  if (is_constant_bool2t(expr))
+  if (is_true(expr))
   {
-    constant_bool2t &b = to_constant_bool2t(expr);
-    b.value = !b.value;
+    expr = gen_false_expr();
+    return;
+  }
+
+  if (is_false(expr))
+  {
+    expr = gen_true_expr();
     return;
   }
 

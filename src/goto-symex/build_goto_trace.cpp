@@ -8,7 +8,9 @@ expr2tc build_lhs(boost::shared_ptr<smt_convt> &smt_conv, const expr2tc &lhs)
     return lhs;
 
   expr2tc new_lhs = lhs;
-  if(is_index2t(new_lhs))
+  switch(new_lhs->expr_id)
+  {
+  case expr2t::index_id:
   {
     // An array subscription
     index2t index = to_index2t(new_lhs);
@@ -18,6 +20,19 @@ expr2tc build_lhs(boost::shared_ptr<smt_convt> &smt_conv, const expr2tc &lhs)
     expr2tc new_source_value = build_lhs(smt_conv, index.source_value);
     expr2tc new_value = smt_conv->get(index.index);
     new_lhs = index2tc(new_lhs->type, new_source_value, new_value);
+    break;
+  }
+
+  case expr2t::typecast_id:
+    new_lhs = to_typecast2t(new_lhs).from;
+    break;
+
+  case expr2t::bitcast_id:
+    new_lhs = to_bitcast2t(new_lhs).from;
+    break;
+
+  default:
+    break;
   }
 
   renaming::renaming_levelt::get_original_name(new_lhs, symbol2t::level0);
@@ -26,10 +41,7 @@ expr2tc build_lhs(boost::shared_ptr<smt_convt> &smt_conv, const expr2tc &lhs)
 
 expr2tc build_rhs(boost::shared_ptr<smt_convt> &smt_conv, const expr2tc &rhs)
 {
-  if(is_nil_expr(rhs))
-    return rhs;
-
-  if(is_constant_number(rhs))
+  if(is_nil_expr(rhs) || is_constant_expr(rhs))
     return rhs;
 
   auto new_rhs = smt_conv->get(rhs);
@@ -38,7 +50,7 @@ expr2tc build_rhs(boost::shared_ptr<smt_convt> &smt_conv, const expr2tc &rhs)
 }
 
 void build_goto_trace(
-  const boost::shared_ptr<symex_target_equationt>& target,
+  const boost::shared_ptr<symex_target_equationt> &target,
   boost::shared_ptr<smt_convt> &smt_conv,
   goto_tracet &goto_trace)
 {
@@ -50,8 +62,7 @@ void build_goto_trace(
     if(!result.is_true())
       continue;
 
-    if(SSA_step.assignment_type == symex_target_equationt::HIDDEN
-       && SSA_step.is_assignment())
+    if(SSA_step.assignment_type == symex_target_equationt::HIDDEN)
       continue;
 
     goto_trace.steps.emplace_back();
@@ -75,9 +86,9 @@ void build_goto_trace(
 
     if(SSA_step.is_output())
     {
-      for(const auto & arg : SSA_step.converted_output_args)
+      for(const auto &arg : SSA_step.converted_output_args)
       {
-        if (is_constant_expr(arg))
+        if(is_constant_expr(arg))
           goto_trace_step.output_args.push_back(arg);
         else
           goto_trace_step.output_args.push_back(smt_conv->get(arg));
@@ -90,17 +101,19 @@ void build_goto_trace(
 }
 
 void build_successful_goto_trace(
-    const boost::shared_ptr<symex_target_equationt>& target,
-    const namespacet &ns,
-    goto_tracet &goto_trace)
+  const boost::shared_ptr<symex_target_equationt> &target,
+  const namespacet &ns,
+  goto_tracet &goto_trace)
 {
-  unsigned step_nr=0;
-  for(symex_target_equationt::SSA_stepst::const_iterator
-      it=target->SSA_steps.begin();
-      it!=target->SSA_steps.end(); it++)
+  unsigned step_nr = 0;
+  for(symex_target_equationt::SSA_stepst::const_iterator it =
+        target->SSA_steps.begin();
+      it != target->SSA_steps.end();
+      it++)
   {
-    if((it->is_assert() || it->is_assume()) &&
-       (is_valid_witness_expr(ns, it->lhs)))
+    if(
+      (it->is_assert() || it->is_assume()) &&
+      (is_valid_witness_expr(ns, it->lhs)))
     {
       // When building the correctness witness, we only care about
       // asserts and assumes
@@ -108,16 +121,16 @@ void build_successful_goto_trace(
         continue;
 
       goto_trace.steps.emplace_back();
-      goto_trace_stept &goto_trace_step=goto_trace.steps.back();
-      goto_trace_step.thread_nr=it->source.thread_nr;
-      goto_trace_step.lhs=it->lhs;
-      goto_trace_step.rhs=it->rhs;
-      goto_trace_step.pc=it->source.pc;
-      goto_trace_step.comment=it->comment;
-      goto_trace_step.original_lhs=it->original_lhs;
-      goto_trace_step.type=it->type;
-      goto_trace_step.step_nr=step_nr++;
-      goto_trace_step.format_string=it->format_string;
+      goto_trace_stept &goto_trace_step = goto_trace.steps.back();
+      goto_trace_step.thread_nr = it->source.thread_nr;
+      goto_trace_step.lhs = it->lhs;
+      goto_trace_step.rhs = it->rhs;
+      goto_trace_step.pc = it->source.pc;
+      goto_trace_step.comment = it->comment;
+      goto_trace_step.original_lhs = it->original_lhs;
+      goto_trace_step.type = it->type;
+      goto_trace_step.step_nr = step_nr++;
+      goto_trace_step.format_string = it->format_string;
       goto_trace_step.stack_trace = it->stack_trace;
     }
   }

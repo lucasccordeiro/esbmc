@@ -20,5 +20,5 @@ __ESBMC_assume(-1000 <= b <= 1000)
 
 v: int = random.randint(a, b)
 
-assert v >= a       # E1
-assert v <= b       # E2
+assert v >= a  # E1
+assert v <= b  # E2

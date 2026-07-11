@@ -20,9 +20,9 @@ __ESBMC_assume(-100.0 <= x <= 100.0)
 
 r: float = math.remainder(x, 4.0)
 
-assert r >= -2.0        # E1
-assert r <= 2.0         # E2
+assert r >= -2.0  # E1
+assert r <= 2.0  # E2
 
-assert math.remainder(5.0, 3.0) == -1.0    # nearest multiple of 3 to 5 is 6
-assert math.remainder(7.0, 3.0) == 1.0     # nearest multiple of 3 to 7 is 6
-assert math.remainder(10.0, 4.0) == 2.0    # tie 8/12 -> even multiple 8
+assert math.remainder(5.0, 3.0) == -1.0  # nearest multiple of 3 to 5 is 6
+assert math.remainder(7.0, 3.0) == 1.0  # nearest multiple of 3 to 7 is 6
+assert math.remainder(10.0, 4.0) == 2.0  # tie 8/12 -> even multiple 8

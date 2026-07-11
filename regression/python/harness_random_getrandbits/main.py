@@ -18,5 +18,5 @@ __ESBMC_assume(0 <= k <= 16)
 
 v: int = random.getrandbits(k)
 
-assert v >= 0                   # E1
-assert v <= (1 << k) - 1        # E2
+assert v >= 0  # E1
+assert v <= (1 << k) - 1  # E2

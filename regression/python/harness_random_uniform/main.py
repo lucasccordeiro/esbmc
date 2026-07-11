@@ -20,6 +20,6 @@ __ESBMC_assume(-1000.0 <= b <= 1000.0)
 v: float = random.uniform(a, b)
 
 if a <= b:
-    assert a <= v and v <= b        # E1
+    assert a <= v and v <= b  # E1
 else:
-    assert b <= v and v <= a        # E2
+    assert b <= v and v <= a  # E2

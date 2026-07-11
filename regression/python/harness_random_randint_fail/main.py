@@ -15,4 +15,4 @@ __ESBMC_assume(-100 <= b <= 100)
 
 v: int = random.randint(a, b)
 
-assert v < b        # F1 — falsifiable (b is a legal result)
+assert v < b  # F1 — falsifiable (b is a legal result)

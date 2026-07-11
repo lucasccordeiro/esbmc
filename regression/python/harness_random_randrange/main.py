@@ -15,7 +15,7 @@ import random
 
 v: int = random.randrange(3, 20, 4)
 
-assert 3 <= v            # E1 lower
-assert v < 20            # E1 upper
+assert 3 <= v  # E1 lower
+assert v < 20  # E1 upper
 assert (v - 3) % 4 == 0  # E2
-assert v == 3 or v == 7 or v == 11 or v == 15 or v == 19   # E3
+assert v == 3 or v == 7 or v == 11 or v == 15 or v == 19  # E3

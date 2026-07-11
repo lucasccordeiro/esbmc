@@ -17,4 +17,4 @@ __ESBMC_assume(-100.0 <= x <= 100.0)
 
 r: float = math.remainder(x, 4.0)
 
-assert r >= 0.0         # F1 — falsifiable (remainder is signed)
+assert r >= 0.0  # F1 — falsifiable (remainder is signed)

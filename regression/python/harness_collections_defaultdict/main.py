@@ -17,9 +17,9 @@ x: int = nondet_int()
 
 d: dict[int, int] = defaultdict(int)
 
-assert d[7] == 0        # E1
+assert d[7] == 0  # E1
 
 d[7] = x
-assert d[7] == x        # E2
+assert d[7] == x  # E2
 
-assert d[100] == 0      # E3
+assert d[100] == 0  # E3

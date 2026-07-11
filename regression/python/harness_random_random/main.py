@@ -12,5 +12,5 @@ import random
 
 r: float = random.random()
 
-assert r >= 0.0     # E1
-assert r < 1.0      # E2
+assert r >= 0.0  # E1
+assert r < 1.0  # E2

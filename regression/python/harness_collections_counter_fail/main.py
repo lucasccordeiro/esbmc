@@ -11,4 +11,4 @@ from collections import Counter
 
 c: Counter = Counter()
 
-assert c[(9, 9)] == 1       # F1 — falsifiable (unwritten key is 0)
+assert c[(9, 9)] == 1  # F1 — falsifiable (unwritten key is 0)

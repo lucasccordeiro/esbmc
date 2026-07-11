@@ -19,9 +19,9 @@ c: int = nondet_int()
 
 d: list[int] = deque([a, b, c])
 
-assert len(d) == 3                              # E1
-assert d[0] == a and d[1] == b and d[2] == c    # E2
+assert len(d) == 3  # E1
+assert d[0] == a and d[1] == b and d[2] == c  # E2
 
 d.append(99)
-assert len(d) == 4                              # E3
-assert d[3] == 99                               # E3
+assert len(d) == 4  # E3
+assert d[3] == 99  # E3

@@ -1,7 +1,7 @@
 # Plan: extend verification-harness coverage of the Python operational models
 
-**Status:** EXECUTED — Tiers 1–3 complete (see §9). `torch` intentionally
-deferred.
+**Status:** EXECUTED — Tiers 1–3 complete (see §9); all surfaced model gaps
+resolved (see §10). `torch` intentionally deferred.
 **Date:** 2026-07-10 (proposal); 2026-07-11 (execution)
 **Related:** PR #5958 (math ints / int / builtins / nondet), PR #5961 (random /
 collections / gamma-remainder), PR #5963 (gamma/lgamma wrong-π model fix). This
@@ -248,7 +248,23 @@ runs can spuriously time out — see §8).
 **Deferred.** `torch` — heaviest tensor model, and like numpy it has no nondet
 surface, so it adds nothing beyond what numpy already demonstrates.
 
-**Model gaps surfaced (candidates for separate fixes).** `heapq`/list-model
-IndexError on symbolic `heappush` and post-append indexing (#5965); `re`
-character-class patterns returning an unconstrained bool (#5981); `time.time()`
-`global` counter stalls the converter (#5973).
+## 10. Model gaps surfaced — all resolved
+
+The harness effort surfaced three suspected model gaps; each was root-caused and
+closed:
+
+- **`re` character-class patterns returning an unconstrained bool** (#5981) —
+  **fixed in PR #5986.** A bare `[x-y]` class (no quantifier) fell through to the
+  matcher's non-deterministic fallback; `try_match_char_class_range` and
+  `search()` now recognise it.
+- **`time.time()` `global` counter stalls the converter** (#5973) — **was a
+  misdiagnosis, not a bug** (PR #5987). `time.time()` verifies correctly; the
+  apparent stall was shared-machine CPU contention. The monotonicity coverage
+  the misdiagnosis had blocked was added instead.
+- **`heapq`/list-model IndexError on `heappush`/post-append indexing** (#5965) —
+  **fixed in PR #5997.** Root cause was general (not heapq-specific): the
+  convert-time constant-index bounds check used the caller's static list length,
+  blind to a mutation performed through a function argument. Lists that escape
+  into a call now fall back to the runtime bounds check. Follow-up PR #6000
+  makes non-negative out-of-bounds reads raise a catchable `IndexError`,
+  matching CPython.
